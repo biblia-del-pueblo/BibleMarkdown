@@ -718,7 +718,7 @@ partial class Program
 		if (FromSource || Imported)
 		{
 			var mdfiles = Directory.EnumerateFiles(path, "*.md")
-				.Where(file => Regex.IsMatch(Path.GetFileName(file), @"^([0-9][0-9])(?!.*?.outline.md)"));
+				.Where(file => Regex.IsMatch(Path.GetFileName(file), @"^([0-9][0-9])(?!.*?\.outline\.md)"));
 
 			var mdtimes = mdfiles.Select(file => File.GetLastWriteTimeUtc(file));
 

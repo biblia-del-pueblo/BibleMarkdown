@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using System.Threading.Tasks;
+using System.Data;
 
 namespace BibleMarkdown;
 
@@ -288,7 +289,7 @@ partial class Program
 	static void CreateOutline(string path)
 	{
 		var sources = Directory.EnumerateFiles(path, "*.md")
-			.Where(file => Regex.IsMatch(Path.GetFileName(file), "^([0-9][0-9])"));
+			.Where(file => Regex.IsMatch(Path.GetFileName(file), @"^([0-9][0-9])(?!.*?\.outline\.md)"));
 		var verses = new StringBuilder();
 
 		var framesfile = Path.Combine(path, "out", "outline.md");
@@ -299,18 +300,18 @@ partial class Program
 
 		var items = new Outline();
 
-		Books.Load(sources);
+        Books.Load(sources);
 
 		foreach (var source in sources)
 		{
 			int bookno = Books.Number(source);
 			string bookname = Books.Name(source);
 
-			var book = Books["default", bookname];
+			var book = Books[Language, bookname];
 
 			var bookItem = new BookItem(book, Path.GetFileName(source));
 
-			items.Add(bookItem);
+            items.Add(bookItem);
 
 			var txt = File.ReadAllText(source);
 
@@ -372,10 +373,20 @@ partial class Program
                 }
 		}
 
-		items.Save(framesfile);
-	}
+		var append = ReadOutlines(path);
+		if (!append.Append && append.Count > 0)
+		{
+			items = append;
+		}
+		else if (append.Append && append.Count > 0)
+		{
+			items = new Outline(items.Concat(append));
+			items.Sort();
+		}
+        items.Save(framesfile);
+    }
 
-	static void CreateUSFM(string mdfile, string usfmfile)
+    static void CreateUSFM(string mdfile, string usfmfile)
 	{
 		if (IsNewer(usfmfile, mdfile) || TwoLanguage) return;
 

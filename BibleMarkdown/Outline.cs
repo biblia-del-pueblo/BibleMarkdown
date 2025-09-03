@@ -16,6 +16,14 @@ public class  Outline: List<OutlineItem>
     public void LogFile(string filename) => Program.LogFile(filename);
 
     public bool Append { get; set; } = false;
+
+    public Outline() { }
+    public Outline(IEnumerable<OutlineItem> items): this()
+    {
+        Clear();
+        AddRange(items);
+    }
+
     public void AddMdOutline(string filename)
     {
         var frame = File.ReadAllText(filename);
@@ -276,6 +284,76 @@ public class  Outline: List<OutlineItem>
         foreach (var book in this.OfType<BookItem>())
         {
             book.Items.Sort();
+        }
+
+        // remove ParagraphItems that are duplicate of a TitleItem and remove duplicate BookItems and ChapterItems
+        var temp = this.ToList();
+        Clear();
+        List<OutlineItem> sameLocation = new List<OutlineItem>(10);
+        for (int i = 0; i < temp.Count;)
+        {
+            int j = i + 1;
+            sameLocation.Add(temp[i]);
+            while (j < temp.Count && Location.Compare(temp[i].Location, temp[j].Location) == 0)
+            {
+                sameLocation.Add(temp[j++]);
+            }
+            i = j;
+            IEnumerable<OutlineItem> toAdd;
+            if (sameLocation.Any(x => x is TitleItem)) toAdd = sameLocation.Where(x => !(x is ParagraphItem));
+            else toAdd = sameLocation;
+            if (toAdd.OfType<BookItem>().Count() > 1) toAdd = toAdd
+                    .Where(x => !(x is BookItem))
+                    .Concat(
+                        toAdd.OfType<BookItem>()
+                            .Take(1)
+                    );
+            if (toAdd.OfType<ChapterItem>().Count() > 1) toAdd = toAdd
+                    .Where(x => !(x is ChapterItem))
+                    .Concat(
+                        toAdd.OfType<ChapterItem>()
+                            .Take(1)
+                    );
+            AddRange(toAdd);
+            sameLocation.Clear();
+        }
+
+        BookItem? bookItem = null;
+        // set BookItem items collection
+        foreach (var item in this)
+        {
+            if (item is BookItem)
+            {
+                bookItem = (BookItem)item;
+                bookItem.Items.Clear();
+            }
+            else if (bookItem != null && item.Location.Book.Number == bookItem.Location.Book.Number) bookItem.Items.Add(item);
+        }
+    }
+
+    public new void Merge()
+    {
+        var list = this.ToList();
+        foreach (var item in list)
+        {
+            if (item is BookItem book)
+            {
+                var existing = this.OfType<BookItem>().FirstOrDefault(b => b.Name == book.Name);
+                if (existing != null && existing != book)
+                {
+                    // Merge items
+                    foreach (var subitem in book.Items)
+                    {
+                        if (!existing.Items.Contains(subitem))
+                        {
+                            existing.Items.Add(subitem);
+                            base.Add(subitem);
+                        }
+                    }
+                    // Remove duplicate book
+                    base.Remove(book);
+                }
+            }
         }
     }
 
