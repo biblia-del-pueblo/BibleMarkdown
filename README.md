@@ -13,6 +13,8 @@ After this, bibmark is added to your PATH and you can execute it from any folder
 bibmark
 ```
 
+To show a help page execute `bibmark -?`.
+
 Alernatively, on Windows you can also install BibleMarkdown with the MSI Installer.
 
 # Documentation
