@@ -8,7 +8,10 @@ dotnet tool install -g BibleMarkdown
 dotnet bibmark
 ```
 
-After this, bibmark is added to your PATH and you can execute it from any folder.
+After this, bibmark is added to your PATH and you can execute it from any folder:
+```
+bibmark
+```
 
 Alernatively, on Windows you can also install BibleMarkdown with the MSI Installer.
 
