@@ -477,7 +477,7 @@ namespace BibleMarkdown
 			}
 		}
 
-		static void ReadMDFrameworkItems(string filename, List<FrameworkItem> items)
+		static void ReadMDOutlineItems(string filename, List<OutlineItem> items)
 		{
 			items.Clear();
 
@@ -529,9 +529,9 @@ namespace BibleMarkdown
 							{
 								Verse = verse,
 								Class = match.Groups["paragraph"].Success ?
-										FrameworkItemClass.Paragraph : match.Groups["footnotes"].Success ?
-											FrameworkItemClass.Footnote : match.Groups["title"].Success ?
-											FrameworkItemClass.Title : FrameworkItemClass.Verse,
+										OutlineItemClass.Paragraph : match.Groups["footnotes"].Success ?
+											OutlineItemClass.Footnote : match.Groups["title"].Success ?
+											OutlineItemClass.Title : OutlineItemClass.Verse,
 								Footnote = match.Groups["footnotes"].Success ? match.Groups["footnotes"].Value : "",
 								Title = match.Groups["title"].Success ? match.Groups["title"].Value : ""
 							};
@@ -541,17 +541,17 @@ namespace BibleMarkdown
 					{
 						switch (token.Class)
 						{
-							case FrameworkItemClass.Title:
+							case OutlineItemClass.Title:
 								var titleItem = new TitleItem(book.Book, token.Title, chapterItem.Chapter, token.Verse);
 								items.Add(titleItem);
 								bookItem.Items.Add(titleItem);
 								break;
-							case FrameworkItemClass.Footnote:
+							case OutlineItemClass.Footnote:
 								var footnoteItem = new FootnoteItem(book.Book, token.Footnote, chapterItem.Chapter, token.Verse);
 								items.Add(footnoteItem);
 								bookItem.Items.Add(footnoteItem);
 								break;
-							case FrameworkItemClass.Paragraph:
+							case OutlineItemClass.Paragraph:
 								var paragraphItem = new ParagraphItem(book.Book, chapterItem.Chapter, token.Verse);
 								items.Add(paragraphItem);
 								bookItem.Items.Add(paragraphItem);
@@ -562,7 +562,7 @@ namespace BibleMarkdown
 			}
 		}
 
-		static void ReadXmlFrameworkItems(string filename, List<FrameworkItem> items)
+		static void ReadXmlOutlineItems(string filename, List<OutlineItem> items)
 		{
 			items.Clear();
 
@@ -616,7 +616,7 @@ namespace BibleMarkdown
 			}
 		}
 
-		public static void DoMapVerses(List<FrameworkItem> items)
+		public static void DoMapVerses(List<OutlineItem> items)
 		{
 			if (MapVerses)
 			{
@@ -673,21 +673,21 @@ namespace BibleMarkdown
 			}
 		}
 
-		static List<FrameworkItem> ReadFramework(string path)
+		static List<OutlineItem> ReadOutlines(string path)
 		{
 			var frmfile = Path.Combine(path, "src", "framework.md");
 			var frmfilexml = Path.ChangeExtension(frmfile, ".xml");
 
-			List<FrameworkItem> items = new List<FrameworkItem>(), subitems = new List<FrameworkItem>();
+			List<OutlineItem> items = new List<OutlineItem>(), subitems = new List<OutlineItem>();
 
-			if (File.Exists(frmfile)) ReadMDFrameworkItems(frmfile, items);
-			else if (File.Exists(frmfilexml)) ReadXmlFrameworkItems(frmfilexml, items);
+			if (File.Exists(frmfile)) ReadMDOutlineItems(frmfile, items);
+			else if (File.Exists(frmfilexml)) ReadXmlOutlineItems(frmfilexml, items);
 
 			var frmparagraphsfile = Path.Combine(path, "src", "framework.paragraphs.md");
 			var frmparagraphsfilexml = Path.ChangeExtension(frmparagraphsfile, ".xml");
 			if (File.Exists(frmparagraphsfile))
 			{
-				ReadMDFrameworkItems(frmparagraphsfile, subitems);
+				ReadMDOutlineItems(frmparagraphsfile, subitems);
 				items = items
 					.Where(item => !(item is ParagraphItem))
 					.Concat(subitems.OfType<ParagraphItem>())
@@ -697,7 +697,7 @@ namespace BibleMarkdown
 			}
 			else if (File.Exists(frmparagraphsfilexml))
 			{
-				ReadXmlFrameworkItems(frmparagraphsfilexml, subitems);
+				ReadXmlOutlineItems(frmparagraphsfilexml, subitems);
 				items = items
 					.Where(item => !(item is ParagraphItem))
 					.Concat(subitems.OfType<ParagraphItem>())
@@ -711,7 +711,7 @@ namespace BibleMarkdown
 			var frmtitlesfilexml = Path.ChangeExtension(frmtitlesfile, ".xml");
 			if (File.Exists(frmtitlesfile))
 			{
-				ReadMDFrameworkItems(frmtitlesfile, subitems);
+				ReadMDOutlineItems(frmtitlesfile, subitems);
 				items = items
 					.Where(item => !(item is TitleItem))
 					.Concat(subitems.OfType<TitleItem>())
@@ -721,7 +721,7 @@ namespace BibleMarkdown
 			}
 			else if (File.Exists(frmtitlesfilexml))
 			{
-				ReadXmlFrameworkItems(frmtitlesfilexml, subitems);
+				ReadXmlOutlineItems(frmtitlesfilexml, subitems);
 				items = items
 					.Where(item => !(item is TitleItem))
 					.Concat(subitems.OfType<TitleItem>())
@@ -735,7 +735,7 @@ namespace BibleMarkdown
 			var frmfootnotesfilexml = Path.ChangeExtension(frmfootnotesfile, ".xml");
 			if (File.Exists(frmfootnotesfile))
 			{
-				ReadMDFrameworkItems(frmfootnotesfile, subitems);
+				ReadMDOutlineItems(frmfootnotesfile, subitems);
 				items = items
 					.Where(item => !(item is FootnoteItem))
 					.Concat(subitems.OfType<FootnoteItem>())
@@ -745,7 +745,7 @@ namespace BibleMarkdown
 			}
 			else if (File.Exists(frmfootnotesfilexml))
 			{
-				ReadXmlFrameworkItems(frmfootnotesfilexml, subitems);
+				ReadXmlOutlineItems(frmfootnotesfilexml, subitems);
 				items = items
 					.Where(item => !(item is FootnoteItem))
 					.Concat(subitems.OfType<FootnoteItem>())
@@ -758,12 +758,12 @@ namespace BibleMarkdown
 
 			ImportParallelVerses(items);
 
-			SortFramework(items);
+			SortOutline(items);
 
 			// remove ParagraphItems that are duplicate of a TitleItem and remove duplicate BookItems and ChapterItems
 			var temp = items;
-			items = new List<FrameworkItem>(temp.Count);
-			List<FrameworkItem> sameLocation = new List<FrameworkItem>(10);
+			items = new List<OutlineItem>(temp.Count);
+			List<OutlineItem> sameLocation = new List<OutlineItem>(10);
 			for (int i = 0; i < temp.Count;)
 			{
 				int j = i + 1;
@@ -773,7 +773,7 @@ namespace BibleMarkdown
 					sameLocation.Add(temp[j++]);
 				}
 				i = j;
-				IEnumerable<FrameworkItem> toAdd;
+				IEnumerable<OutlineItem> toAdd;
 				if (sameLocation.Any(x => x is TitleItem)) toAdd = sameLocation.Where(x => !(x is ParagraphItem));
 				else toAdd = sameLocation;
 				if (toAdd.OfType<BookItem>().Count() > 1) toAdd = toAdd
@@ -807,7 +807,7 @@ namespace BibleMarkdown
 			return items;
 		}
 
-		public static void ImportParallelVerses(List<FrameworkItem> items)
+		public static void ImportParallelVerses(List<OutlineItem> items)
 		{
 			// import parallel verses
 			foreach (var parverse in ParallelVerseList.ParallelVerses)
@@ -827,7 +827,7 @@ namespace BibleMarkdown
 			}
 		}
 
-		public static void SortFramework(List<FrameworkItem> items)
+		public static void SortOutline(List<OutlineItem> items)
 		{
 			// Sort mapped items
 			items.Sort();
@@ -848,7 +848,7 @@ namespace BibleMarkdown
 
 				Books.Load(mdfiles);
 
-				List<FrameworkItem> items = ReadFramework(path);
+				List<OutlineItem> items = ReadOutlines(path);
 
 
 				if (items.Count > 0)
@@ -900,7 +900,7 @@ namespace BibleMarkdown
 
 						var frames = bookItem.Items.GetEnumerator();
 						var book = Books["default", bookname];
-						FrameworkItem? frame = frames.MoveNext() ? frames.Current : null;
+						OutlineItem? frame = frames.MoveNext() ? frames.Current : null;
 						int chapter = 0;
 						int verse = -1;
 

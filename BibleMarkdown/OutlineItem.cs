@@ -1,18 +1,18 @@
 ﻿namespace BibleMarkdown
 {
-	public enum FrameworkItemClass { Book, Chapter, Title, Footnote, Paragraph, Verse }
-	public class FrameworkItem: IComparable<FrameworkItem>
+	public enum OutlineItemClass { Book, Chapter, Title, Footnote, Paragraph, Verse }
+	public class OutlineItem: IComparable<OutlineItem>
 	{
 		public Location Location;
-		public FrameworkItemClass Class
+		public OutlineItemClass Class
 		{
 			get
 			{
-				if (this is BookItem) return FrameworkItemClass.Book;
-				if (this is ChapterItem) return FrameworkItemClass.Chapter;
-				if (this is TitleItem) return FrameworkItemClass.Title;
-				if (this is FootnoteItem) return FrameworkItemClass.Footnote;
-				if (this is ParagraphItem) return FrameworkItemClass.Paragraph;
+				if (this is BookItem) return OutlineItemClass.Book;
+				if (this is ChapterItem) return OutlineItemClass.Chapter;
+				if (this is TitleItem) return OutlineItemClass.Title;
+				if (this is FootnoteItem) return OutlineItemClass.Footnote;
+				if (this is ParagraphItem) return OutlineItemClass.Paragraph;
 				else throw new NotSupportedException();
 			}
 		}
@@ -20,7 +20,7 @@
 		public int Verse { get { return Location.Verse; } set { Location.Verse = value; } }
 		public int Chapter { get { return Location.Chapter; } set { Location.Verse = value; } }
 
-		public FrameworkItem(Book book, int chapter = 0, int verse = -1)
+		public OutlineItem(Book book, int chapter = 0, int verse = -1)
 		{
 			Location = new Location()
 			{
@@ -30,7 +30,7 @@
 			};
 		}
 
-		public int CompareTo(FrameworkItem? other)
+		public int CompareTo(OutlineItem? other)
 		{
 			var sameloc = Location.Compare(Location, other.Location);
 			if (sameloc != 0) return sameloc;
@@ -42,13 +42,13 @@
 		}
 	}
 
-	public class BookItem : FrameworkItem
+	public class BookItem : OutlineItem
 	{
 		public string Name;
 		public string File;
 		public bool VerseParagraphs;
 		public bool MapVerses;
-		public List<FrameworkItem> Items = new List<FrameworkItem>();
+		public List<OutlineItem> Items = new List<OutlineItem>();
 		public BookItem(Book book, string file) : base(book, 0, -1)
 		{
 			Name = book.Name;
@@ -56,11 +56,11 @@
 		}
 	}
 
-	public class ChapterItem : FrameworkItem
+	public class ChapterItem : OutlineItem
 	{
 		public ChapterItem(Book book, int chapter) : base(book, chapter, -1) { }
 	}
-	public class TitleItem : FrameworkItem
+	public class TitleItem : OutlineItem
 	{
 		public string Title;
 
@@ -70,7 +70,7 @@
 		}
 	}
 
-	public class FootnoteItem : FrameworkItem
+	public class FootnoteItem : OutlineItem
 	{
 		public string Footnote;
 		public FootnoteItem(Book book, string footnote, int chapter, int verse) : base(book, chapter, verse)
@@ -79,7 +79,7 @@
 		}
 	}
 
-	public class ParagraphItem : FrameworkItem
+	public class ParagraphItem : OutlineItem
 	{
 		public ParagraphItem(Book book, int chapter, int verse) : base(book, chapter, verse) { }
 	}

@@ -284,19 +284,19 @@ namespace BibleMarkdown
 			LogFile(frames);
 		}
 
-		static void CreateFramework(string path)
+		static void CreateOutline(string path)
 		{
 			var sources = Directory.EnumerateFiles(path, "*.md")
 				.Where(file => Regex.IsMatch(Path.GetFileName(file), "^([0-9][0-9])"));
 			var verses = new StringBuilder();
 
-			var framesfile = Path.Combine(path, "out", "framework.md");
+			var framesfile = Path.Combine(path, "out", "outline.md");
 			var frametime = DateTime.MinValue;
 			if (File.Exists(framesfile)) frametime = File.GetLastWriteTimeUtc(framesfile);
 
 			if (sources.All(src => File.GetLastWriteTimeUtc(src) < frametime) && frametime > bibmarktime) return;
 
-			var items = new List<FrameworkItem>();
+			var items = new List<OutlineItem>();
 
 			Books.Load(sources);
 
@@ -373,7 +373,7 @@ namespace BibleMarkdown
 
 			// ImportParallelVerses(items);
 
-			SortFramework(items);
+			SortOutline(items);
 
 			var result = new StringBuilder();
 			Location lastlocation = Location.Zero;

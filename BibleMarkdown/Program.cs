@@ -182,7 +182,7 @@ namespace BibleMarkdown
                 ImportFromBibleMarkdown(path, srcpath);
                 ImportFramework(path);
 			}
-			CreateFramework(path);
+			CreateOutline(path);
 			CreateVerseStats(path);
 			Log("Convert to Pandoc...");
 			var files = Directory.EnumerateFiles(path, "*.md");
