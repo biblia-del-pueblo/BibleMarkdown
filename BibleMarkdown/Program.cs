@@ -271,8 +271,6 @@ Bible Markdown is normal pandoc Markdown with the following extensions:
    in a paragraph. For use in Psalms and Proverbs.
 - Chapter numbers are denoted with a # markdown title and Chapter headings
    with a ## markdown title
-- A special comment //!verse-paragraphs can be placed in the text, so that for
-   this document, all verses are placed in a separate paragraph
 - A special comment //!replace /regularexpression/replacement/regularexpression/replacement/...
    can be placed in the text. All the regular expressions will be replaced. You can
    choose another delimiter char than /, the first character encountered will be used as delimiter.
@@ -299,9 +297,9 @@ those files in a subfolder src. If you specify the -s argument to bibmark,
 bibmark searches this folder for USFM source and creates Bible Markdown
 files in the main folder if the source files are newer than the Bible Markdown
 files. Instead of USFM you can also place a Zefania XML file or a BibleEdit
-or a Javascripture file/folder in the src folder. You can also place a bibmark
-folder containing .md files that will be copied to the main folder. That way
-you can placce a git submodule in the bibmark folder containing BibleMarkdown.
+or a Javascripture file/folder in the src folder. You can also place a folder 'bibmark'
+containing .md files that will be copied to the main folder. That way
+you can placce a git submodule in the src/bibmark folder containing BibleMarkdown.
 From the Bible Markdown files, bibmark creates Pandoc files in the
 out/pandoc folder, LaTeX files in the out/tex folder, HTML files in the
 out/html folder and USFM files in the out/usfm folder.
