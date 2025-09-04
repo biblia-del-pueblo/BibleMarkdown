@@ -784,16 +784,36 @@ partial class Program
 			var bookInfo = Books[Language]?.FirstOrDefault(b => b.Key == name).Value;
 
 			var sb = new StringBuilder();
-			int chapterno = 1;
+            var phrase = new StringBuilder();
+            int chapterno = 1;
 			int verseno = 1;
 			foreach (var chapter in book.Value as JArray)
 			{
 				sb.AppendLine($"# {chapterno++}");
 				foreach (var versetoken in chapter as JArray) {
-					var verse = (string)versetoken;
+					string verse;
+					if (versetoken is JArray versearr)
+					{
+						var words = versearr.Select(x => (string)(((JArray)x)[0]));
+						phrase.Clear();
+						foreach (var word in words)
+						{
+							if (phrase.Length > 0 && word != "." && word != ":"&& word != "," && word != ";" && word != "?" && word != "!" && word != "¿" && word != "¡")
+							{
+								phrase.Append(" ");
+							}
+							phrase.Append(word);
+						}
+						verse = phrase.ToString();
+					}
+					else
+					{
+						verse = (string)versetoken;
+					}
 					verse = Regex.Replace(verse, "<[0-9A-Z]+>", "");
 					if (EachVerseOnNewLine) sb.AppendLine($"@{verseno++} {verse}");
-					else {
+					else
+					{
 						if (verseno > 1) sb.Append(" ");
 						sb.Append($"@{verseno++} {verse}");
 					}
