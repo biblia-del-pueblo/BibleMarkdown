@@ -2,7 +2,7 @@
 BibleMarkdown or bibmark.exe is an application that transforms source markup like USFM, BibleEdit or Zefania XML to Bible Markdown and then to LaTeX, HTML, Epub, Pandoc Markdown & USFM.
 
 # Installation
-You can install bibmark on Windows, Linux and MacOS. You need to have .NET 8 SDK installed. Then you can execute the following commands in a shell:
+You can install bibmark on Windows, Linux and MacOS. You need to have [.NET 8 SDK](https://dotnet.microsoft.com/en-us/download/dotnet) installed. Then you can execute the following commands in a shell:
 ```
 dotnet tool install -g BibleMarkdown
 ```
@@ -23,7 +23,6 @@ Bible Markdown is normal pandoc Markdown with the following extensions:
 - Verse numbers are denoted with a @ character followed by a number, like this: @1 In the beginning was the Word and the Word was with God and the Word was God. @2 This was in the beginning...
 - if the text contains the comment //!verse-paragraphs, each verse is rendered in a paragraph. For use in Psalms and Proverbs.
 - Chapter numbers are denoted with a # markdown title and Chapter headings with a ## markdown title
-- A special comment //!verse-paragraphs can be placed in the text, so that for this document, all verses are placed in a separate paragraph
 - A special comment //!replace /regularexpression/replacement/regularexpression/replacement/... can be placed in the text. All the regular expressions will be replaced. You can choose another delimiter char than /, the first character encountered will be used as delimiter.
 
 If you have the source text of your Bible in USFM markup, you can place those files in a subfolder src. If you specify the -s argument to bibmark, bibmark searches this folder for USFM source and creates Bible Markdown files in the main folder if the source files are newer than the Bible Markdown files. Instead of USFM you can also place a Zefania XML file or a BibleEdit or a Javascripture file/folder in the src folder. You can also place a bibmark folder containing .md files that will be copied to the main folder. That way you can placce a git submodule in the bibmark folder containing BibleMarkdown.
