@@ -348,8 +348,8 @@ many verses each chapter has, so you can compare different Bibles versifications
 
 You can also place a file linklist.xml in the src folder, to specify parallel verses
 included in footnotes, that will be imported and placed in the footnotes.
-This file will be exported as ParallelVerses.md & ParallelVerses.xml in the main
-directory.
+This file will be exported as ParallelVerses.outline.md &
+ParallelVerses.outline.xml in the main directory.
 
 For examples of the various input files like booknames.xml, linklist.xml, outline.md etc.
 you can have a look at the Bibles in the BibliaLibre project at
