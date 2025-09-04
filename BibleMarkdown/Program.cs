@@ -189,7 +189,7 @@ partial class Program
             ImportFromXmlOther(path, srcpath);
             ImportFromBibleMarkdown(path, srcpath);
             ImportParallelVerses(path);
-            ImportOutline(srcpath);
+            ImportOutline(path);
         }
         ReadOutlineForCreate(path);
         CreateOutline(path);
@@ -332,7 +332,7 @@ Options:
             var envpath = Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.Machine);
             var envpaths = envpath.Split(';');
             var location = Assembly.GetExecutingAssembly().Location;
-            if (!envpaths.Any(p => p == location))
+            if (!envpaths.Any(p => File.Exists(Path.Combine(p, "bibmark.exe"))))
             {
                 Environment.SetEnvironmentVariable("PATH", envpath + ";" + location, EnvironmentVariableTarget.Machine);
                 Console.WriteLine("Added bibmark to PATH environment variable.");

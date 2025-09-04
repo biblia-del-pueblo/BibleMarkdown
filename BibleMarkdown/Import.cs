@@ -458,7 +458,7 @@ partial class Program
 									else text.Append(" ");
 								}
 								firstverse = false;
-								if (Program.ParagraphVerses) text.Append($"§{((int)verse.Attribute("vnumber"))} ");
+								if (Program.ParagraphVerses) text.Append($"§{((int)verse.Attribute("n"))} ");
 								else text.Append($"^{((int)verse.Attribute("n"))}^ ");
 								text.Append(verse.Value);
 							}
