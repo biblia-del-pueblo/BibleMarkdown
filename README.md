@@ -14,7 +14,7 @@ bibmark
 
 To show a help page execute `bibmark -?`.
 
-Alernatively, on Windows you can also install BibleMarkdown with the MSI Installer.
+Alernatively, on Windows, you can also install BibleMarkdown with the MSI Installer.
 
 # Documentation
 Bible Markdown is normal pandoc Markdown with the following extensions:
