@@ -297,7 +297,7 @@ partial class Program
 		var frametime = DateTime.MinValue;
 		if (File.Exists(framesfile)) frametime = File.GetLastWriteTimeUtc(framesfile);
 
-		if (sources.All(src => File.GetLastWriteTimeUtc(src) < frametime) && frametime > bibmarktime) return;
+		if (!sources.Any() || sources.All(src => File.GetLastWriteTimeUtc(src) < frametime) && frametime > bibmarktime) return;
 
 		var items = new Outline();
 
