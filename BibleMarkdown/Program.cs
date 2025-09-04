@@ -337,8 +337,8 @@ For example the following
 12:16=>13:1 13:1=>13:2 13:33=>13:33
 ```
 will point 12:16 to 13:1 and then all verses one up, until verse 13:33.
-You can create the mapping files by comparing the verseinfo.md files of the
-different bibles via the diff tool.
+You can create the mapping files by comparing the verseinfo.md (see below) 
+files of the different bibles via the diff tool.
 
 bibmark also creates a file verseinfo.md in the out folder, a file that shows how
 many verses each chapter has, so you can compare different Bibles versifications.
