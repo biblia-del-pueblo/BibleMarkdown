@@ -290,12 +290,15 @@ books in different languages. The names of the books should correspond to the ti
 of the books in the USFM files. Then you can also import a Parallel Verses file,
 linklist.xml, that contains parallel verses.
 
-If you have the source text of your Bible in USFM markup, you can place those
-files in a subfolder src. If you specify the -s argument to bibmark, bibmark
-searches this folder for USFM source and creates Bible Markdown files in the
-main folder if the source files are newer than the Bible Markdown files. From
-the Bible Markdown files, bibmark creates LaTeX files in the out/tex folder and
-HTML files in the out/html folder.
+If you have the source text of your Bible in USFM markup, you can place
+those files in a subfolder src. If you specify the -s argument to bibmark,
+bibmark searches this folder for USFM source and creates Bible Markdown
+files in the main folder if the source files are newer than the Bible Markdown
+files. Instead of USFM you can also place a Zefania XML file or a BibleEdit
+folder in the src folder. 
+From the Bible Markdown files, bibmark creates Pandoc files in the
+out/pandoc folder, LaTeX files in the out/tex folder, HTML files in the
+out/html folder and USFM files in the out/usfm folder.
 
 bibmark also creates a file called outline.md & outline.xml in the out folder that
 specifies chapter titles, paragraphs and footnotes. If you move this file to the
@@ -347,7 +350,7 @@ directory.
 
 For examples of the various input files like booknames.xml, linklist.xml, outline.md etc.
 you can have a look at the Bibles in the BibliaLibre project at
-https://github.com/biblia-.del-pueblo/BibliaLibre.
+https://github.com/biblia-del-pueblo/BibliaLibre.
 
 Options:
   - -s, -src or -source:

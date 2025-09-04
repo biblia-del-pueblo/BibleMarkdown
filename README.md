@@ -2,7 +2,7 @@
 BibleMarkdown or bibmark.exe is an application that transforms source markup like USFM, BibleEdit or Zefania XML to Bible Markdown and then to LaTeX, HTML, Epub, Pandoc Markdown & USFM.
 
 # Installation
-You can install bibmark on Windows, Linux and MacOS. You need to have .NET 8 Runtime installed. Then you can execute the following commands in a shell:
+You can install bibmark on Windows, Linux and MacOS. You need to have .NET 8 installed. Then you can execute the following commands in a shell:
 ```
 dotnet tool install -g BibleMarkdown
 dotnet bibmark
@@ -27,20 +27,31 @@ Bible Markdown is normal pandoc Markdown with the following extensions:
 - A special comment //!verse-paragraphs can be placed in the text, so that for this document, all verses are placed in a separate paragraph
 - A special comment //!replace /regularexpression/replacement/regularexpression/replacement/... can be placed in the text. All the regular expressions will be replaced. You can choose another delimiter char than /, the first character encountered will be used as delimiter.
 
-If you have the source text of your Bible in USFM markup, you can place those files in a subfolder src. If you specify the -s argument to bibmark, bibmark searches this folder for USFM source and creates Bible Markdown files in the main folder if the source files are newer than the Bible Markdown files. From the Bible Markdown files, bibmark creates LaTeX files in the out/tex folder and HTML files in the out/html folder.
+If you have the source text of your Bible in USFM markup, you can place those files in a subfolder src. If you specify the -s argument to bibmark, bibmark searches this folder for USFM source and creates Bible Markdown files in the main folder if the source files are newer than the Bible Markdown files. Instead of USFM you can also place a Zefania XML file or a BibleEdit folder in the src folder. 
+From the Bible Markdown files, bibmark creates Pandoc files in the out/pandoc folder, LaTeX files in the out/tex folder, HTML files in the out/html folder and USFM files in the out/usfm folder.
 
-bibmark also creates a file called framework.md in the out folder that specifies chapter titles and paragraphs and footnotes. If you move this file to the src folder and it is newer than the Bible Markdown files, bibmark applies the chapter titles and paragraphs and footnotes found in the framework.md file to the Bible Markdown files.
-In the framework.md file, the Bible Markdown files are specified by a # markdown title, the chapter numbers by a ## markdown title, and chapter titles by a ### markdown title.
+bibmark also creates a file called outline.md & outline.xml in the out folder that specifies chapter titles, paragraphs and footnotes. If you move this file to the src folder and it is newer than the Bible Markdown files, bibmark applies the chapter titles and paragraphs and footnotes found in the outline.md file to the Bible Markdown files.
+In the outline.md file, the Bible Markdown files are specified by a # markdown title, the chapter numbers by a ## markdown title, and chapter titles by a ### markdown title.
 Verses that contain a paragraph or a footnote are denoted with superscript markdown notation followed by a \ for a paragraph or a ^^ for a footnote marker, or a ^[Footnote]
 footnote.
+You can also specify mutliple *.outline.md files, that will be merged.
+If you put a //!append directive in one of those files, The titles, paragraphs and footnotes will be added to the .md files. If you ommit //!append, the titles, paragraphs and footnotes in the outline.md files will replace the titles, paragraphs and footnotes in the .md files.
+You can also put the .outline.md files in the folder with your .md files, in that case the outlines will be applied to the .md files on output generation.
+You can also change the versification of the .outline.md files by putting a //!map <versification> directive in the .outline.md file or a Map attribute on the BibleFramework root node in outline.xml.
+You then put a verse mapping in the file versification.map.md.
+The syntax of the verse mapping md file is as follows:
+```
+# <book>
+<chapter>:<verse>=><tochapter>:<toverse> <chapter2>:<verse2>=><tochapter2>:<toverse2> ...
+```
+For example the following
+```
+# Números
+12:16=>13:1 13:1=>13:2 13:33=>13:33
+```
+will point 12:16 to 13:1 and then all verses one up, until verse 13:33.
+You can create the mapping files by comparing the verseinfo.md files of the different bibles via the diff tool.
 
-bibmark also creates a file verses.md in the out folder, a file that shows how many verses each chapter has, so you can compare different Bibles verse numberings.
+bibmark also creates a file verseinfo.md in the out folder, a file that shows how many verses each chapter has, so you can compare different Bibles versifications.
 
-You can also place a file linklist.xml in the src folder, to specify parallel verses included in footnotes, that will be imported and placed in the footnotes.
-
-When importing framework.md or footnotes, one can map different versifications of the files to the current versification with placing the following files in src:
-- parallelversesmap.md for mapping the verses of linklist.xml to the current versification.
-- paragraphsmap.md for mapping the verses of paragraphs in framework.md to the current versification.
-- titlesmap.md for mapping the verses of titles in framework.md to the current versification.
-- footnotesmap.md for mapping of footnotes in framework.md to the current versification.
-- duallanguagemap.md for mapping the versification of the secondary language to the primary language in two column two language bibles.
+You can also place a file linklist.xml in the src folder, to specify parallel verses included in footnotes, that will be imported and placed in the footnotes. This file will be exported as ParallelVerses.md & ParallelVerses.xml in the main directory.
