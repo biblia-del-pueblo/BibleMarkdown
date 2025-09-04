@@ -98,7 +98,7 @@ public class  Outline: List<OutlineItem>
                 }
 
                 int verse = -1;
-                var tokens = Regex.Matches(chapter.Body, @"\^(?<verse>-?[0-9]+)\^|§(?<verse2>-?[0-9]+)|(?<paragraph>\\)|(?<footnote>\^\[(?>\[(?<c>)|[^\[\]]+|\](?<-c>))*(?(c)(?!))\])|(?<=\n)###\s+(?<title>.*?)(\r?\n|$)", RegexOptions.Singleline)
+                var tokens = Regex.Matches(chapter.Body, @"\^(?<verse>-?[0-9]+)\^|@(?<verse2>-?[0-9]+)|(?<paragraph>\\)|(?<footnote>\^\[(?>\[(?<c>)|[^\[\]]+|\](?<-c>))*(?(c)(?!))\])|(?<=\n)###\s+(?<title>.*?)(\r?\n|$)", RegexOptions.Singleline)
                     .Select(match =>
                     {
 
@@ -392,7 +392,7 @@ public class  Outline: List<OutlineItem>
             else if (item is TitleItem)
             {
                 var titleItem = (TitleItem)item;
-                if (Location.Compare(lastlocation, item.Location) != 0) result.AppendLine(Program.ParagraphVerses ? $"§{item.Verse}" : $"^{item.Verse}^");
+                if (Location.Compare(lastlocation, item.Location) != 0) result.AppendLine(Program.ParagraphVerses ? $"@{item.Verse}" : $"^{item.Verse}^");
                 var title = new XElement("Title");
                 title.Value = titleItem.Title.Trim();
                 title.Add(new XAttribute("Verse", item.Verse));
@@ -403,7 +403,7 @@ public class  Outline: List<OutlineItem>
             else if (item is FootnoteItem)
             {
                 var footnoteItem = (FootnoteItem)item;
-                if (Location.Compare(lastlocation, item.Location) != 0) result.Append(Program.ParagraphVerses ? $"§{item.Verse} " : $"^{item.Verse}^ ");
+                if (Location.Compare(lastlocation, item.Location) != 0) result.Append(Program.ParagraphVerses ? $"@{item.Verse} " : $"^{item.Verse}^ ");
                 var footnote = new XElement("Footnote");
                 footnote.Value = footnoteItem.Footnote;
                 footnote.Add(new XAttribute("Verse", item.Verse));
@@ -413,7 +413,7 @@ public class  Outline: List<OutlineItem>
             }
             else if (item is ParagraphItem)
             {
-                if (Location.Compare(lastlocation, item.Location) != 0) result.Append(Program.ParagraphVerses ? $"§{item.Verse} " : $"^{item.Verse}^ ");
+                if (Location.Compare(lastlocation, item.Location) != 0) result.Append(Program.ParagraphVerses ? $"@{item.Verse} " : $"^{item.Verse}^ ");
                 var paragraph = new XElement("Paragraph");
                 paragraph.Add(new XAttribute("Verse", item.Verse));
                 if (chapterxml != null) chapterxml.Add(paragraph);

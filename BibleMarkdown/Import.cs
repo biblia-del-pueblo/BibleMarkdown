@@ -122,7 +122,7 @@ partial class Program
 						return res;
 					});
 
-					if (Program.ParagraphVerses) src = Regex.Replace(src, @"\\v\s+([0-9]+)", "§$1"); // verse numbers
+					if (Program.ParagraphVerses) src = Regex.Replace(src, @"\\v\s+([0-9]+)", "@$1"); // verse numbers
 					else src = Regex.Replace(src, @"\\v\s+([0-9]+)", "^$1^"); // verse numbers
 
 					// footnotes
@@ -169,7 +169,7 @@ partial class Program
 					}
 
 					src = Regex.Replace(src, @"\^[0-9]+\^(?=\s*(\^[0-9]+\^|#|$|\^[a-zA-Z]\^\[))", "", RegexOptions.Singleline); // remove empty verses
-					src = Regex.Replace(src, @"§[0-9]+(?=\s*(§[0-9]+|#|$|\^[a-zA-Z]\^\[))", "", RegexOptions.Singleline); // remove empty verses
+					src = Regex.Replace(src, @"@[0-9]+(?=\s*(@[0-9]+|#|$|\^[a-zA-Z]\^\[))", "", RegexOptions.Singleline); // remove empty verses
 					src = Regex.Replace(src, @"(?<!\s|^)(\^[0-9]+\^)", " $1", RegexOptions.Singleline);
 					src = Regex.Replace(src, @"(?<=(^|\n)#[ \t]+[0-9]+[ \t]*\r?\n)(##.*?\r?\n)?(?<verse0>.*?)(?=\s*\^1\^)", match => // set italics on verse 0
 					{
@@ -182,7 +182,7 @@ partial class Program
 					if (EachVerseOnNewLine)
 					{
 						src = Regex.Replace(src, @"(?<!^)(\^[0-9]+\^)", $"{Environment.NewLine}$1", RegexOptions.Multiline);
-						src = Regex.Replace(src, @"(?<!^)(§[0-9]+)", $"{Environment.NewLine}$1", RegexOptions.Multiline);
+						src = Regex.Replace(src, @"(?<!^)(@[0-9]+)", $"{Environment.NewLine}$1", RegexOptions.Multiline);
 					}
 
 					var md = Path.Combine(mdpath, $"{booknostr}-{book}.md");
@@ -327,7 +327,7 @@ partial class Program
 						string text = Regex.Replace(m.Groups[4].Value, @"\r?\n", " ").Trim();
 						if (Program.ParagraphVerses)
 						{
-							s.Append($"{(verse == "1" ? "" : (EachVerseOnNewLine ? $"{Environment.NewLine}" : " "))}§{verse} {text}");
+							s.Append($"{(verse == "1" ? "" : (EachVerseOnNewLine ? $"{Environment.NewLine}" : " "))}@{verse} {text}");
 						}
 						else
 						{
@@ -394,7 +394,7 @@ partial class Program
 									else text.Append(" ");
 								}
 								firstverse = false;
-								if (Program.ParagraphVerses) text.Append($"§{((int)verse.Attribute("vnumber"))} ");
+								if (Program.ParagraphVerses) text.Append($"@{((int)verse.Attribute("vnumber"))} ");
 								else text.Append($"^{((int)verse.Attribute("vnumber"))}^ ");
 								text.Append(verse.Value);
 							}
@@ -462,7 +462,7 @@ partial class Program
 									else text.Append(" ");
 								}
 								firstverse = false;
-								if (Program.ParagraphVerses) text.Append($"§{((int)verse.Attribute("n"))} ");
+								if (Program.ParagraphVerses) text.Append($"@{((int)verse.Attribute("n"))} ");
 								else text.Append($"^{((int)verse.Attribute("n"))}^ ");
 								text.Append(verse.Value);
 							}
@@ -640,7 +640,7 @@ partial class Program
 		int chapter = 0;
 		int verse = -1;
 
-		src = Regex.Replace(src, @"(?<=^|\n)#[ \t]+(?<chapter>[0-9]+)(\s*\r?\n|$)|\^(?<verse>[0-9]+)\^.*?(?=\s*\^[0-9]+\^|\s*§[0-9]+|\s*#|\s*$)|§(?<verse2>[0-9]+).*?(?=\s*\^[0-9]+\^|\s*§[0-9]+|\s*#|\s*$)|(?<=(^|\n)#[ \t]+[0-9]+[ \t]*\r?\n(##[ \t]+.*?\r?\n)?)(?<empty>.*?)(?=\s*\\?\s*\^1\^|\s*\\?\s*§1|\s*#|\s*$)", m =>
+		src = Regex.Replace(src, @"(?<=^|\n)#[ \t]+(?<chapter>[0-9]+)(\s*\r?\n|$)|\^(?<verse>[0-9]+)\^.*?(?=\s*\^[0-9]+\^|\s*@[0-9]+|\s*#|\s*$)|@(?<verse2>[0-9]+).*?(?=\s*\^[0-9]+\^|\s*@[0-9]+|\s*#|\s*$)|(?<=(^|\n)#[ \t]+[0-9]+[ \t]*\r?\n(##[ \t]+.*?\r?\n)?)(?<empty>.*?)(?=\s*\\?\s*\^1\^|\s*\\?\s*@1|\s*#|\s*$)", m =>
 		// empty is special text at the beginning of a psalm without verse number
 		{
 			var txt = m.Value;
@@ -690,7 +690,7 @@ partial class Program
 		}, RegexOptions.Singleline);
 
 		// remove whitespace before a verse on a new line
-		src = Regex.Replace(src, @"(?<=(^|\n))[ \t]+(\^[0-9]+\^|§[0-9]+)", "$2", RegexOptions.Singleline);
+		src = Regex.Replace(src, @"(?<=(^|\n))[ \t]+(\^[0-9]+\^|@[0-9]+)", "$2", RegexOptions.Singleline);
 
 		// hack because of bad output
 		// remove empty line after ## title

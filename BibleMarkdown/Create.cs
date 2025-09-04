@@ -62,7 +62,7 @@ partial class Program
 		if (Regex.IsMatch(text, @"(//|/\*)!verse-paragraphs(\s|\r?\n|\*/)", RegexOptions.Singleline)) // each verse in a separate paragraph. For use in Psalms & Proverbs
 		{
 			text = Regex.Replace(text, @"(\^[0-9]+\^[^#]*?)(\s*?)(?=\^[0-9]+\^)", "$1\\\n", RegexOptions.Singleline);
-			text = Regex.Replace(text, @"(§[0-9]+[^#]*?)(\s*?)(?=§[0-9]+)", "$1\\\n", RegexOptions.Singleline);
+			text = Regex.Replace(text, @"(@[0-9]+[^#]*?)(\s*?)(?=@[0-9]+)", "$1\\\n", RegexOptions.Singleline);
 		}
 
 		// text = Regex.Replace(text, @"\^([0-9]+)\^", @"\bibleverse{$1}"); // verses
@@ -76,7 +76,7 @@ partial class Program
 		text = Regex.Replace(text, @"([\u0590-\u05fe]+)", "[$1]{.hebrew}");
 		text = Regex.Replace(text, @"([\u0370-\u03ff\u1f00-\u1fff]+)", "[$1]{.greek}");
 		text = Regex.Replace(text, @"\^([0-9]+)\^", "[$1]{.bibleverse}");
-		text = Regex.Replace(text, @"§([0-9]+)", "[$1]{.bibleverse}");
+		text = Regex.Replace(text, @"@([0-9]+)", "[$1]{.bibleverse}");
 
 		/*
 		text = Regex.Replace(text, @" ^# (.*?)$", @"\chapter{$1}", RegexOptions.Multiline);
@@ -242,7 +242,7 @@ partial class Program
 			int verse = 0;
 			int nverses = 0;
 			int totalverses = 0;
-			var matches = Regex.Matches(txt, @"((^|\n)#\s+(?<chapter>[0-9]+))|(\^(?<verse>[0-9]+)\^(?!\s*[#\^§$]))|(§(?<verse2>[0-9]+)(?!\s*[#\^§$]))", RegexOptions.Singleline);
+			var matches = Regex.Matches(txt, @"((^|\n)#\s+(?<chapter>[0-9]+))|(\^(?<verse>[0-9]+)\^(?!\s*[#\^@$]))|(@(?<verse2>[0-9]+)(?!\s*[#\^@$]))", RegexOptions.Singleline);
 			foreach (Match m in matches)
 			{
 				if (m.Groups[1].Success)
@@ -344,7 +344,7 @@ partial class Program
 				var chaptertext = chapter.Groups["text"].Value;
 
 				var tokens = Regex.Matches(chaptertext,
-					@"\^(?<verse>[0-9]+)\^|§(?<verse2>[0-9]+)|(?<footnote>\^\[(?>\[(?<c>)|[^\[\]]+|\](?<-c>))*(?(c)(?!))\])(?=(?<endofverse>\s*?((\^[0-9]+\^|§[0-9]+)|\n#|$)))|(?<=\r?\n)(?<blank>\r?\n)(?!\s*?(?:\^[a-zA-Z]+\^\[|#|$))(?=\s*\^[0-9]+\^|\s*§[0-9]+)|(?<=\r?\n|^)##(?<title>.*?)(?=\r?\n|$)",
+					@"\^(?<verse>[0-9]+)\^|@(?<verse2>[0-9]+)|(?<footnote>\^\[(?>\[(?<c>)|[^\[\]]+|\](?<-c>))*(?(c)(?!))\])(?=(?<endofverse>\s*?((\^[0-9]+\^|@[0-9]+)|\n#|$)))|(?<=\r?\n)(?<blank>\r?\n)(?!\s*?(?:\^[a-zA-Z]+\^\[|#|$))(?=\s*\^[0-9]+\^|\s*@[0-9]+)|(?<=\r?\n|^)##(?<title>.*?)(?=\r?\n|$)",
 					RegexOptions.Singleline);
 				int verse = -1;
 
