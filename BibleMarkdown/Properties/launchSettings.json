@@ -3,7 +3,7 @@
     "BibleMarkdown": {
       "commandName": "Project",
       "commandLineArgs": "-s",
-      "workingDirectory": "C:\\GitHub\\BibliaLibre\\Bibles\\Spanish.OpenNuevaBibliaViva"
+      "workingDirectory": "C:\\GitHub\\BibliaLibre\\Bibles\\English.StandardVersion"
     },
     "WSL": {
       "commandName": "WSL2",

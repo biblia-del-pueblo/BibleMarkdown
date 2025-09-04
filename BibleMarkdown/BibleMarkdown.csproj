@@ -22,9 +22,9 @@
 		<RepositoryUrl>https://github.com/biblia-del-pueblo/BibleMarkdown</RepositoryUrl>
 		<RepositoryType>git</RepositoryType>
 		<PackageTags>OpenSource, Bible, Bibles, Public Domain, Biblia, Markdown, Bible Markdown, Bible Converter</PackageTags>
-		<AssemblyVersion>4.0.8</AssemblyVersion>
-		<FileVersion>4.0.8</FileVersion>
-		<Version>4.0.8</Version>
+		<AssemblyVersion>4.0.9</AssemblyVersion>
+		<FileVersion>4.0.9</FileVersion>
+		<Version>4.0.9</Version>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<IncludeSymbols>true</IncludeSymbols>
 		<PublishRepositoryUrl>true</PublishRepositoryUrl>
@@ -49,6 +49,7 @@
 	<ItemGroup>
 		<PackageReference Include="CliWrap" Version="3.4.4" />
 		<PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="4.2.0" />
+		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
 	</ItemGroup>
 
 	<ItemGroup>

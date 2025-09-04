@@ -8,6 +8,8 @@ using System.Threading.Tasks;
 using System.Diagnostics.Contracts;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System.Security.Cryptography.X509Certificates;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace BibleMarkdown;
 
@@ -765,5 +767,46 @@ partial class Program
 				}
 			}
 		}
+	}
+
+	public static void ImportJavascripture(string mdpath, string srcpath)
+	{
+		var json = System.IO.Directory.EnumerateFiles(srcpath, "*.json")
+			.Select(file => File.ReadAllText(file))
+			.Where(src => src.Contains("\"version\":") && src.Contains("\"versionName\":") && src.Contains("\"books\":"))
+			.Select(src => JObject.Parse(src))
+			.FirstOrDefault();
+		var books = json["books"] as JObject;
+		int bookno = 1;
+		foreach (var book in books.Properties())
+		{
+			var name = book.Name;
+			var bookInfo = Books[Language]?.FirstOrDefault(b => b.Key == name).Value;
+
+			var sb = new StringBuilder();
+			int chapterno = 1;
+			int verseno = 1;
+			foreach (var chapter in book.Value as JArray)
+			{
+				sb.AppendLine($"# {chapterno++}");
+				foreach (var versetoken in chapter as JArray) {
+					var verse = (string)versetoken;
+					verse = Regex.Replace(verse, "<[0-9A-Z]+>", "");
+					if (EachVerseOnNewLine) sb.AppendLine($"@{verseno++} {verse}");
+					else {
+						if (verseno > 1) sb.Append(" ");
+						sb.Append($"@{verseno++} {verse}");
+					}
+				}
+				sb.AppendLine();
+			}
+
+			string mdfile;
+			if (bookInfo != null) mdfile = Path.Combine(mdpath, $"{bookInfo.Number}-{bookInfo.Name}.md");
+			else mdfile = $"{bookno++}-{name}.md";
+			File.WriteAllText(mdfile, sb.ToString());
+			LogFile(mdfile);
+		}
+
 	}
 }

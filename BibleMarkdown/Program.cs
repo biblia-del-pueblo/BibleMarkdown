@@ -187,6 +187,7 @@ partial class Program
             ImportFromTXT(path, srcpath);
             ImportFromZefania(path, srcpath);
             ImportFromXmlOther(path, srcpath);
+            ImportJavascripture(path, srcpath);
             ImportFromBibleMarkdown(path, srcpath);
             ImportParallelVerses(path);
             ImportOutline(path);
@@ -298,7 +299,9 @@ those files in a subfolder src. If you specify the -s argument to bibmark,
 bibmark searches this folder for USFM source and creates Bible Markdown
 files in the main folder if the source files are newer than the Bible Markdown
 files. Instead of USFM you can also place a Zefania XML file or a BibleEdit
-folder in the src folder. 
+or a Javascripture file/folder in the src folder. You can also place a bibmark
+folder containing .md files that will be copied to the main folder. That way
+you can placce a git submodule in the bibmark folder containing BibleMarkdown.
 From the Bible Markdown files, bibmark creates Pandoc files in the
 out/pandoc folder, LaTeX files in the out/tex folder, HTML files in the
 out/html folder and USFM files in the out/usfm folder.
