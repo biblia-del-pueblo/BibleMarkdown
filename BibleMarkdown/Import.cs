@@ -151,9 +151,13 @@ partial class Program
 					src = Regex.Replace(src, @"\\it\s*(.*?)\s*\\it\*", "*$1*", RegexOptions.Singleline); //italics
 					src = Regex.Replace(src, @"\\sc\s*(.*?)\s*\\sc\*", "[$1]{.smallcaps}", RegexOptions.Singleline); // smallcaps
 					src = Regex.Replace(src, @"\\wj\s*(.*?)\s*\\wj\*", "[$1]{.wj}", RegexOptions.Singleline); // words of jesus
-					src = Regex.Replace(src, @"\\nd\s*(.*?)\s*\\nd\*", "[$1]{.smallcaps}", RegexOptions.Singleline); // name of God
+                    //src = Regex.Replace(src, @"\\nd\s*(.*?)\s*\\nd\*", "[$1]{.smallcaps}", RegexOptions.Singleline); // name of God
+                    src = Regex.Replace(src, @"\\nd\s*(.*?)\s*\\nd\*", match =>
+					{
+						return match.Value.ToUpper();
+					}, RegexOptions.Singleline); // name of God
 
-					src = Regex.Replace(src, @"\\\+?\w+(\*|[ \t]*)?", "", RegexOptions.Singleline); // remove usfm tags
+                    src = Regex.Replace(src, @"\\\+?\w+(\*|[ \t]*)?", "", RegexOptions.Singleline); // remove usfm tags
 					src = Regex.Replace(src, @" +", " "); // remove multiple spaces
 					src = Regex.Replace(src, @"\^\[([0-9]+)[.,:]([0-9]+)", "^[**$1:$2**"); // bold verse references in footnotes
 					src = Regex.Replace(src, @"((?<![0-9]+|\s|{)\.(?![0-9]+)|\?|!|;|(?<![0-9]+):(?![0-9]+)|(?<![0-9]+),(?![0-9]+))(\w|“|¿|¡)", "$1 $2"); // Add space after dot
