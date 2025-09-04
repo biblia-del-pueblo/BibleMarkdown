@@ -20,8 +20,6 @@ partial class Program
 
 		text = ApplyOutline(text, file, OutlineForCreate);
 
-        text = Preprocess(text);
-
 		string? bookname = Books.Name(file);
 		int bookno = Books.Number(file);
 
@@ -33,7 +31,10 @@ partial class Program
 				text = Regex.Replace(text, tokens[i], tokens[i + 1], RegexOptions.Singleline);
 			}
 		}
-		var replmatch = Regex.Match(text, @"(/\*|//)!replace\s+(?<replace>.*?)(\*/|$)", RegexOptions.Multiline);
+
+        text = Preprocess(text);
+
+        var replmatch = Regex.Match(text, @"(/\*|//)!replace\s+(?<replace>.*?)(\*/|$)", RegexOptions.Multiline);
 		if (replmatch.Success)
 		{
 			var s = replmatch.Groups["replace"].Value;
@@ -348,20 +349,14 @@ partial class Program
 				int verse = -1;
 
 				foreach (Match token in tokens)
+				{
 					if (token.Groups["verse"].Success) verse = int.Parse(token.Groups["verse"].Value);
 					else if (token.Groups["verse2"].Success) verse = int.Parse(token.Groups["verse2"].Value);
-					/* else if (token.Groups["footnote"].Success && token.Groups["endofverse"].Success)
-					{
-						var item = new FootnoteItem(book, token.Groups["footnote"].Value, chapterItem.Chapter, verse);
-						items.Add(item);
-						bookItem.Items.Add(item);
-					} don't add footnotes, only add linklist footnotes */
 					else if (token.Groups["blank"].Success)
 					{
 						var item = new ParagraphItem(book, chapterItem.Chapter, verse);
 						items.Add(item);
 						bookItem.Items.Add(item);
-
 					}
 					else if (token.Groups["title"].Success)
 					{
@@ -370,7 +365,8 @@ partial class Program
 						bookItem.Items.Add(item);
 					}
 					if (verse == -1) verse = 0;
-                }
+				}
+			}
 		}
 
 		var append = ReadOutlines(path);

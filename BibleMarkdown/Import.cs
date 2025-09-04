@@ -500,6 +500,7 @@ partial class Program
 		// remove ParagraphItems that are duplicate of a TitleItem and remove duplicate BookItems and ChapterItems
 		var temp = items;
 		items = new Outline();
+		items.Append = temp.Append;
 		List<OutlineItem> sameLocation = new List<OutlineItem>(10);
 		for (int i = 0; i < temp.Count;)
 		{
@@ -548,7 +549,8 @@ partial class Program
 	{
 		Outline items = new Outline();
 
-        // import parallel verses
+		// import parallel verses
+		int lastbook = -1, lastchapter = -11;
         foreach (var parverse in new BibleMarkdown.ParallelVerses().Load(Path.Combine(path, "src")))
 		{
             StringBuilder footnote = new StringBuilder($"^[**{parverse.Verse.Chapter}:{(parverse.Verse.Verse > 1 ? parverse.Verse.Verse : 1)}** ");
@@ -562,9 +564,20 @@ partial class Program
 				if (pv.UpToVerse.HasValue && pv.UpToVerse.Value > 0) footnote.Append($"-{pv.UpToVerse}");
 			}
 			footnote.Append("]");
+			if (lastbook != parverse.Verse.Book.Number)
+			{
+				var file = $"{parverse.Verse.Book.Number:d2}-{parverse.Verse.Book.Name}.md";
+				items.Add(new BookItem(parverse.Verse.Book, file));
+				lastchapter = -1;
+			}
+			if (lastchapter != parverse.Verse.Chapter)
+			{
+				items.Add(new ChapterItem(parverse.Verse.Book, parverse.Verse.Chapter));
+			}
 			items.Add(new FootnoteItem(parverse.Verse.Book, footnote.ToString(), parverse.Verse.Chapter, parverse.Verse.Verse));
 		}
 
+		items.Append = true;
 		if (items.Count > 0) items.Save(Path.Combine(path, "ParallelVerses.outline.md"));
 	}
 
@@ -580,7 +593,7 @@ partial class Program
 			.FirstOrDefault(b => b.File == srcname);
 		if (bookItem == null)
 		{
-			Log($"Book for {Regex.Replace(srcname, @"(^[0-9]{2}(\.[0-9]+)?-)|(.md$)", "")} not found in framework.md");
+			Log($"Book for {Regex.Replace(srcname, @"(^[0-9]{2}(\.[0-9]+)?-)|(.md$)", "")} not found in outline.md");
 			return src;
 			//continue; // use when loop with foreach for sequential loop for debugging
 		}
@@ -677,7 +690,7 @@ partial class Program
 
 		// hack because of bad output
 		// remove empty line after ## title
-		src = Regex.Replace(src, @"(?<=(^|\n)##[^\r\n]*?\r?\n)[ \t]*\r?\n", "", RegexOptions.Singleline);
+		src = Regex.Replace(src, @"(?<=(^|\n)##[^\r\n]*?\r?\n)([ \t]*\r?\n)+", "", RegexOptions.Singleline);
 		// remove multiple emtpy lines
 		src = Regex.Replace(src, @"(?<=(^|\n))([ \t]*\r?\n)+[ \t]*(?=\r?\n)", "", RegexOptions.Singleline);
 
@@ -730,18 +743,22 @@ partial class Program
 			{
 				Log("Importing Outline...");
 
-				Parallel.ForEach(mdfiles, srcfile =>
-				//foreach (var srcfile in mdfiles)
+				//Parallel.ForEach(mdfiles, srcfile =>
+				foreach (var srcfile in mdfiles)
 				{
 
 					File.SetLastWriteTimeUtc(srcfile, DateTime.Now);
 					var src = File.ReadAllText(srcfile);
 
-					src = ApplyOutline(src, srcfile, items);
+					var modsrc = ApplyOutline(src, srcfile, items);
 
-					File.WriteAllText(srcfile, src);
-					LogFile(srcfile);
-				});
+					if (src != modsrc)
+					{
+						File.WriteAllText(srcfile, modsrc);
+						LogFile(srcfile);
+					}
+					//});
+				}
 			}
 		}
 	}

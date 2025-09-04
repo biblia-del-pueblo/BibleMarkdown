@@ -42,11 +42,11 @@ public class BookList : SortedList<string, SortedList<string, Book>>
 
 	public string Name(string file)
 	{
-		return Regex.Replace(Path.GetFileNameWithoutExtension(file), "^[0-9.]+-", "", RegexOptions.Singleline).Trim();
+		return Regex.Replace(file.EndsWith(".md") ? Path.GetFileNameWithoutExtension(file) : file, "^[0-9.]+-", "", RegexOptions.Singleline).Trim();
 	}
 	public int Number(string file)
 	{
-		var match = Regex.Match(Path.GetFileNameWithoutExtension(file), "^[0-9]+", RegexOptions.Singleline);
+		var match = Regex.Match(file.EndsWith(".md") ? Path.GetFileNameWithoutExtension(file) : file, "^[0-9]+", RegexOptions.Singleline);
 		if (match.Success) return int.Parse(match.Value);
 		return -1;
 	}
@@ -152,25 +152,26 @@ public class ParallelVerses : List<ParallelVerse>
             }
         }
 
+		var mapfn = (Location loc) => Map != null ? Map.Map(loc) : loc;
         var verses = xml
 			.Descendants("verse")
 			.Select(x =>
 			{
-				var book = BookList.Books[(int)x.Attribute("bn")];
-				return new ParallelVerse
+				var book = BookList.Books[Program.Language, (int)x.Attribute("bn")];
+                return new ParallelVerse
 				{
-					Verse = Map.Map(new Location
+					Verse = mapfn(new Location
 					{
-						Book = book,
-						Chapter = (int)x.Attribute("cn"),
-						Verse = (int)x.Attribute("vn"),
-						UpToVerse = null
-					}),
+                        Book = book,
+                        Chapter = (int)x.Attribute("cn"),
+                        Verse = (int)x.Attribute("vn"),
+                        UpToVerse = null
+                    }),
 					ParallelVerses = x.Elements("link")
 						.Select(link =>
 						{
 							var linkbook = BookList.Books[(int)link.Attribute("bn")];
-							var verse = Map.Map(new Location
+							var verse = mapfn(new Location
 							{
 								Book = linkbook,
 								Chapter = (int)link.Attribute("cn1"),
@@ -187,7 +188,7 @@ public class ParallelVerses : List<ParallelVerse>
 			.ThenBy(v => v.Verse.Chapter)
 			.ThenBy(v => v.Verse.Verse);
 
-		foreach (var verse in verses) Add(verse);
+		AddRange(verses);
 
 		return this;
 	}

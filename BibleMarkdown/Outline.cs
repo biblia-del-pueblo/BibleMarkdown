@@ -53,7 +53,7 @@ public class  Outline: List<OutlineItem>
         var books = Regex.Matches(frame, @"(^|\n)#\s+(?<book>.*?)[ \t]*\r?\n(?<bookbody>.*?)(?=\r?\n#\s|$)", RegexOptions.Singleline)
             .Select(match => new
             {
-                Name = Program.Books.Name(match.Groups["book"].Value),
+                Name = Books.Name(match.Groups["book"].Value),
                 Body = match.Groups["bookbody"].Value,
                 Book = Books[Language, Books.Name(match.Groups["book"].Value)]
             });
@@ -98,7 +98,7 @@ public class  Outline: List<OutlineItem>
                 }
 
                 int verse = -1;
-                var tokens = Regex.Matches(chapter.Body, @"\^(?<verse>[0-9]+)\^|§(?<verse2>[0-9]+)|(?<paragraph>\\)|(?<footnote>\^\[(?>\[(?<c>)|[^\[\]]+|\](?<-c>))*(?(c)(?!))\])|(?<=\n)###\s+(?<title>.*?)(\r?\n|$)", RegexOptions.Singleline)
+                var tokens = Regex.Matches(chapter.Body, @"\^(?<verse>-?[0-9]+)\^|§(?<verse2>-?[0-9]+)|(?<paragraph>\\)|(?<footnote>\^\[(?>\[(?<c>)|[^\[\]]+|\](?<-c>))*(?(c)(?!))\])|(?<=\n)###\s+(?<title>.*?)(\r?\n|$)", RegexOptions.Singleline)
                     .Select(match =>
                     {
 
@@ -233,7 +233,7 @@ public class  Outline: List<OutlineItem>
 
     public OutlineItem MapItem(VerseMaps map, OutlineItem item)
     {
-        if (map != null && item is TitleItem || item is ParagraphItem || item is FootnoteItem)
+        if (map != null && (item is TitleItem || item is ParagraphItem || item is FootnoteItem))
         {
             item.Location = map.Map(item.Location);
             if (item is FootnoteItem footnote)
@@ -366,6 +366,10 @@ public class  Outline: List<OutlineItem>
 
         XElement? filexml = null, chapterxml = null;
         XElement root = new XElement("BibleFramework");
+        if (Append) {
+            root.Add(new XAttribute("Append", true));
+            result.AppendLine("//!append");
+        }
         foreach (var item in this)
         {
             if (item is BookItem)
@@ -382,7 +386,7 @@ public class  Outline: List<OutlineItem>
                 result.AppendLine($"{Environment.NewLine}## {item.Chapter}");
                 chapterxml = new XElement("Chapter");
                 chapterxml.Add(new XAttribute("Number", item.Chapter));
-                if (filexml == null) Log("Error: No file for framework.");
+                if (filexml == null) Log("Error: No file for outline.");
                 else filexml.Add(chapterxml);
             }
             else if (item is TitleItem)
@@ -393,7 +397,7 @@ public class  Outline: List<OutlineItem>
                 title.Value = titleItem.Title.Trim();
                 title.Add(new XAttribute("Verse", item.Verse));
                 if (chapterxml != null) chapterxml.Add(title);
-                else Log("Error: No chapter for framework.");
+                else Log("Error: No chapter for outline.");
                 result.AppendLine($"{Environment.NewLine}###{titleItem.Title}");
             }
             else if (item is FootnoteItem)
@@ -404,7 +408,7 @@ public class  Outline: List<OutlineItem>
                 footnote.Value = footnoteItem.Footnote;
                 footnote.Add(new XAttribute("Verse", item.Verse));
                 if (chapterxml != null) chapterxml.Add(footnote);
-                else Log("Error: No chapter for framework.");
+                else Log("Error: No chapter for outline.");
                 result.Append(footnoteItem.Footnote); result.Append(' ');
             }
             else if (item is ParagraphItem)
@@ -413,7 +417,7 @@ public class  Outline: List<OutlineItem>
                 var paragraph = new XElement("Paragraph");
                 paragraph.Add(new XAttribute("Verse", item.Verse));
                 if (chapterxml != null) chapterxml.Add(paragraph);
-                else Log("Error: No chapter for framework.");
+                else Log("Error: No chapter for outline.");
                 result.Append("\\ ");
             }
             lastlocation = item.Location;

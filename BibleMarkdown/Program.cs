@@ -195,7 +195,8 @@ partial class Program
         CreateOutline(path);
         CreateVerseStats(path);
         Log("Convert to Pandoc...");
-        var files = Directory.EnumerateFiles(path, "*.md");
+        var files = Directory.EnumerateFiles(path, "*.md")
+            .Where(file => Regex.IsMatch(Path.GetFileName(file), @"^[0-9.]+-.*?(?!outline.md$|map.md$)"));
         Task.WaitAll(files.AsParallel().Select(file => ProcessFileAsync(file)).ToArray());
         File.WriteAllText(Path.Combine(outpath, "bibmark.log"), log.ToString());
         log.Clear();
