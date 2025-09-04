@@ -36,7 +36,7 @@ footnote.
 You can also specify mutliple *.outline.md files, that will be merged.
 If you put a //!append directive in one of those files, The titles, paragraphs and footnotes will be added to the .md files. If you ommit //!append, the titles, paragraphs and footnotes in the outline.md files will replace the titles, paragraphs and footnotes in the .md files.
 You can also put the .outline.md files in the folder with your .md files, in that case the outlines will be applied to the .md files on output generation.
-You can also change the versification of the .outline.md files by putting a //!map <versification> directive in the .outline.md file or a Map attribute on the BibleFramework root node in outline.xml.
+You can also change the versification of the .outline.md files by putting a //!map &lt;versification&gt; directive in the .outline.md file or a Map attribute on the BibleFramework root node in outline.xml.
 You then put a verse mapping in the file versification.map.md.
 The syntax of the verse mapping md file is as follows:
 ```
