@@ -5,7 +5,6 @@ BibleMarkdown or bibmark.exe is an application that transforms source markup lik
 You can install bibmark on Windows, Linux and MacOS. You need to have .NET 8 installed. Then you can execute the following commands in a shell:
 ```
 dotnet tool install -g BibleMarkdown
-dotnet bibmark
 ```
 
 After this, bibmark is added to your PATH and you can execute it from any folder:
