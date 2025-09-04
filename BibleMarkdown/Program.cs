@@ -271,8 +271,6 @@ Bible Markdown is normal pandoc Markdown with the following extensions:
    in a paragraph. For use in Psalms and Proverbs.
 - Chapter numbers are denoted with a # markdown title and Chapter headings
    with a ## markdown title
-- A special comment //!verse-paragraphs can be placed in the text, so that for
-   this document, all verses are placed in a separate paragraph
 - A special comment //!replace /regularexpression/replacement/regularexpression/replacement/...
    can be placed in the text. All the regular expressions will be replaced. You can
    choose another delimiter char than /, the first character encountered will be used as delimiter.

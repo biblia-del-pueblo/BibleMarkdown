@@ -22,9 +22,9 @@
 		<RepositoryUrl>https://github.com/biblia-del-pueblo/BibleMarkdown</RepositoryUrl>
 		<RepositoryType>git</RepositoryType>
 		<PackageTags>OpenSource, Bible, Bibles, Public Domain, Biblia, Markdown, Bible Markdown, Bible Converter</PackageTags>
-		<AssemblyVersion>4.0.10</AssemblyVersion>
-		<FileVersion>4.0.10</FileVersion>
-		<Version>4.0.10</Version>
+		<AssemblyVersion>4.0.11</AssemblyVersion>
+		<FileVersion>4.0.11</FileVersion>
+		<Version>4.0.11</Version>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<IncludeSymbols>true</IncludeSymbols>
 		<PublishRepositoryUrl>true</PublishRepositoryUrl>
