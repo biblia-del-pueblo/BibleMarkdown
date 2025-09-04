@@ -42,6 +42,9 @@ The syntax of the verse mapping md file is as follows:
 ```
 # <book>
 <chapter>:<verse>=><tochapter>:<toverse> <chapter2>:<verse2>=><tochapter2>:<toverse2> ...
+
+# <book2>
+...
 ```
 For example the following
 ```
