@@ -317,9 +317,9 @@ Bible Markdown files.
 In the outline.md file, the Bible Markdown files are specified by a # markdown
 title, the chapter numbers by a ## markdown title, and chapter titles by a ###
 markdown title.
-Verses that contain a paragraph or a footnote are denoted with superscript
-markdown notation followed by a \ for a paragraph or a ^^ for a footnote
-marker, or a ^[Footnote] footnote.
+Verses that end with a paragraph or a footnote are denoted with @n with n
+denoting the verse number,  followed by a \ for a paragraph or a ^^ for a
+footnote marker, or a ^[Footnote] footnote.
 You can also specify mutliple *.outline.md files, that will be merged.
 If you put a //!append directive in one of those files, The titles, paragraphs
 and footnotes will be added to the .md files. If you ommit //!append, the
