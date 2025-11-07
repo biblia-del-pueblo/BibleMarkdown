@@ -30,7 +30,7 @@ From the Bible Markdown files, bibmark creates Pandoc files in the out/pandoc fo
 
 bibmark also creates a file called outline.md & outline.xml in the out folder that specifies chapter titles, paragraphs and footnotes. If you move this file to the src folder and it is newer than the Bible Markdown files, bibmark applies the chapter titles and paragraphs and footnotes found in the outline.md file to the Bible Markdown files.
 In the outline.md file, the Bible Markdown files are specified by a # markdown title, the chapter numbers by a ## markdown title, and chapter titles by a ### markdown title.
-Verses that contain a paragraph or a footnote are denoted with superscript markdown notation followed by a \ for a paragraph or a ^^ for a footnote marker, or a ^[Footnote]
+Verses that end with a paragraph or a footnote are denoted with @n with n denoting the verse number, followed by a \ for a paragraph or a ^^ for a footnote marker, or a ^[Footnote]
 footnote.
 You can also specify mutliple *.outline.md files, that will be merged.
 If you put a //!append directive in one of those files, The titles, paragraphs and footnotes will be added to the .md files. If you ommit //!append, the titles, paragraphs and footnotes in the outline.md files will replace the titles, paragraphs and footnotes in the .md files.
