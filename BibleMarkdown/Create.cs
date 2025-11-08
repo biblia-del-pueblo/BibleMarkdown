@@ -102,7 +102,7 @@ partial class Program
         src = Regex.Replace(src, @"\[([0-9]+)\]\{\.bibleverse\}", @"\bibleverse{$1}");
 		src = Regex.Replace(src, @"\[([\u0590-\u05fe]+)\]\{\.hebrew\}", @"\hebrew{$1}");
 		src = Regex.Replace(src, @"\[([\u0370-\u03ff\u1f00-\u1fff]+)\]\{\.greek\}", @"\greek{$1}");
-		src = Regex.Replace(src, @"\[(.+?)\]\{.wj\}", @"\wordsOfJesus{$1}"); // words of Jesus
+		src = Regex.Replace(src, @"\[((?>\[(?<depth>)|\](?<-depth>)|[^\[\]]+)*)\](?(depth)(?!)){.wj\}", @"\wordsOfJesus{$1}"); // words of Jesus
 		src = Regex.Replace(src, @"^(# .*?)$\n^(## .*?)$", "$2\n$1", RegexOptions.Multiline); // titles
 		src = Regex.Replace(src, @"^# ([0-9]+)\s*$", $"\\hypertarget{{section-{book}-$1}}{{%\n\\section{{$1}}\\label{{section-{book}-$1}}}}",
 			RegexOptions.Multiline); // section hyperlinks
