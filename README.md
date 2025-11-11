@@ -2,7 +2,7 @@
 BibleMarkdown or bibmark.exe is an application that transforms source markup like USFM, BibleEdit or Zefania XML to Bible Markdown and then to LaTeX, HTML, Epub, Pandoc Markdown & USFM.
 
 # Installation
-You can install bibmark on Windows, Linux and MacOS. You need to have [.NET 8 SDK](https://dotnet.microsoft.com/en-us/download/dotnet) installed. Then you can execute the following commands in a shell:
+You can install bibmark on Windows, Linux and MacOS. You need to have [.NET 10 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/10.0) installed. Then you can execute the following commands in a shell:
 ```
 dotnet tool install -g BibleMarkdown
 ```
