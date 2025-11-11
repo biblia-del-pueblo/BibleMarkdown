@@ -19,7 +19,7 @@
 		<Description>A Markdown converter tailored for creation of Bibles</Description>
 		<Copyright>Estrellas de Esperanza</Copyright>
 		<PackageProjectUrl>https://github.com/biblia-del-pueblo/BibleMarkdown</PackageProjectUrl>
-		<PackageReadmeFile>tools/net8.0/any/README.md</PackageReadmeFile>
+		<PackageReadmeFile>tools/net10.0/any/README.md</PackageReadmeFile>
 		<RepositoryUrl>https://github.com/biblia-del-pueblo/BibleMarkdown</RepositoryUrl>
 		<RepositoryType>git</RepositoryType>
 		<PackageTags>OpenSource, Bible, Bibles, Public Domain, Biblia, Markdown, Bible Markdown, Bible Converter</PackageTags>
