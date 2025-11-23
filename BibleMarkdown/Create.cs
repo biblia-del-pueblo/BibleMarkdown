@@ -1,11 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Xml.Linq;
 using System.Threading.Tasks;
-using System.Data;
+using System.Xml.Linq;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace BibleMarkdown;
 
@@ -408,7 +409,7 @@ partial class Program
 				.Select(line => $"\\rem {line.Trim()}");
 			return $"{Environment.NewLine}{string.Join(Environment.NewLine, lines)}";
 		}, RegexOptions.Singleline); // comments
-		txt = Regex.Replace(txt, @"//(.*?\r?\n)", "\\rem $1", RegexOptions.Singleline); // single line comments
+        txt = Regex.Replace(txt, @"(?<!:)//(.*?\r?\n)", "\\rem $1", RegexOptions.Singleline); // single line comments
                                                                                 
 		// remove bibmark footnotes.
             bool replaced = true;
