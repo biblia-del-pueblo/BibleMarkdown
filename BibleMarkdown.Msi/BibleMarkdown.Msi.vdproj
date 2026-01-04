@@ -177,15 +177,15 @@
         {
         "Name" = "8:Microsoft Visual Studio"
         "ProductName" = "8:BibleMarkdown"
-        "ProductCode" = "8:{45183F5B-F402-4F95-86EC-FC034C976901}"
-        "PackageCode" = "8:{A20A3E82-6A76-4F5F-9DC3-D1E6AE2E791E}"
+        "ProductCode" = "8:{D87FBAAE-BEE9-4C39-882C-493103CF103D}"
+        "PackageCode" = "8:{BA74F6A3-2ABA-4327-92F6-4C4BA17A7E72}"
         "UpgradeCode" = "8:{19151234-7313-4091-888A-89A8AEB4A1FD}"
         "AspNetVersion" = "8:4.0.30319.0"
         "RestartWWWService" = "11:FALSE"
         "RemovePreviousVersions" = "11:TRUE"
         "DetectNewerInstalledVersion" = "11:TRUE"
         "InstallAllUsers" = "11:FALSE"
-        "ProductVersion" = "8:4.0.19"
+        "ProductVersion" = "8:4.0.25"
         "Manufacturer" = "8:Biblia del Pueblo"
         "ARPHELPTELEPHONE" = "8:"
         "ARPHELPLINK" = "8:http://github.com/biblia-del-pueblo/BibleMarkdown"
@@ -777,7 +777,7 @@
         {
             "{5259A561-127C-4D43-A0A1-72F10C7B3BF8}:_DA0601FDE6BC49E3B718DB656B56F6A8"
             {
-            "SourcePath" = "8:..\\BibleMarkdown\\obj\\Release\\net8.0\\apphost.exe"
+            "SourcePath" = "8:..\\BibleMarkdown\\obj\\Release\\net10.0\\apphost.exe"
             "TargetName" = "8:"
             "Tag" = "8:"
             "Folder" = "8:_6A96BE4D5E754DA6BE28E63A6BE5CBA3"
