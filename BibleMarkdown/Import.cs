@@ -42,6 +42,7 @@ partial class Program
 		if (FromSource)
 		{
 			var sources = Directory.EnumerateFiles(srcpath)
+				.Where(file => !Path.GetFileName(file).Equals("booknames.xml", StringComparison.InvariantCultureIgnoreCase))
 				.ToList();
 			if (sources.Count == 1 && sources[0].EndsWith(".zip", StringComparison.InvariantCultureIgnoreCase))
 			{
@@ -112,8 +113,9 @@ partial class Program
 						}
 					} else
 					{
-						book = Books.Name(source);
-						var booknumber = Books.Number(source);
+						var filename = Path.GetFileNameWithoutExtension(source);
+                        book = Books.Name(filename);
+						var booknumber = Books.Number(filename);
 						if (booknumber >= 0) bookno = booknumber;
                         booknostr = $"{bookno:d2}";
                     }
