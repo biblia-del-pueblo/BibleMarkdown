@@ -50,6 +50,7 @@ public class BookList : SortedList<string, SortedList<string, Book>>
 		if (match.Success) return int.Parse(match.Value);
 		return -1;
 	}
+
 	public void Load(string path)
 	{
 		if (Count > 1) return;
@@ -112,6 +113,8 @@ public class BookList : SortedList<string, SortedList<string, Book>>
 	public IEnumerable<Book> All => Values.SelectMany(lang => lang.Values);
 
 	public static BookList Books = new BookList();
+
+	public static bool HasBookList => Books != null && Books.Count > 0;
 }
 
 public class ParallelVerse

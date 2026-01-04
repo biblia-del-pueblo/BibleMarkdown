@@ -182,6 +182,7 @@ partial class Program
         if (Directory.Exists(srcpath))
         {
             BookList.Books.Load(path);
+            ImportFromZip(path, srcpath);
             ImportFromBibleEdit(srcpath);
             ImportFromUSFM(path, srcpath);
             ImportFromTXT(path, srcpath);

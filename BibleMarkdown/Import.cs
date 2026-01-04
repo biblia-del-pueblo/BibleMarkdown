@@ -37,6 +37,20 @@ partial class Program
 		}
 	}
 
+	static void ImportFromZip(string mdpath, string srcpath)
+	{
+		if (FromSource)
+		{
+			var sources = Directory.EnumerateFiles(srcpath)
+				.ToList();
+			if (sources.Count == 1 && sources[0].EndsWith(".zip", StringComparison.InvariantCultureIgnoreCase))
+			{
+				var zipfile = sources[0];
+				System.IO.Compression.ZipFile.ExtractToDirectory(zipfile, srcpath, true);
+			}
+		}
+    }
+
     static void ImportFromUSFM(string mdpath, string srcpath)
 	{
 		var sources = Directory.EnumerateFiles(srcpath)
@@ -96,9 +110,15 @@ partial class Program
 						{
 							booknostr = $"00.{bookno:d2}";
 						}
-					}
+					} else
+					{
+						book = Books.Name(source);
+						var booknumber = Books.Number(source);
+						if (booknumber >= 0) bookno = booknumber;
+                        booknostr = $"{bookno:d2}";
+                    }
 
-					src = Regex.Match(src, @"\\c\s+[0-9]+.*", RegexOptions.Singleline).Value; // remove header that is not content of a chapter
+                    src = Regex.Match(src, @"\\c\s+[0-9]+.*", RegexOptions.Singleline).Value; // remove header that is not content of a chapter
 
 					src = src.Replace("\r", "").Replace("\n", ""); // remove newlines
 
