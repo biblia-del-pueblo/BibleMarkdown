@@ -21,7 +21,7 @@ partial class Program
 		srcpath = Path.Combine(srcpath, "bibmark");
 		if (!Directory.Exists(srcpath)) return;
 		var sources = Directory.EnumerateFiles(srcpath)
-			.Where(file => file.EndsWith(".md"));
+			.Where(file => file.EndsWith(".md") && Regex.IsMatch(file, "^[0-9.]-"));
 		if (sources.Any())
 		{
 			if (FromSource)
@@ -659,7 +659,7 @@ partial class Program
 		if (bookItem.VerseParagraphs) src = $"//!verse-paragraphs{Environment.NewLine}{src}";
 
 		var frames = bookItem.Items.GetEnumerator();
-		var book = Books["default", bookname];
+		//var book = Books["default", bookname];
 		OutlineItem? frame = frames.MoveNext() ? frames.Current : null;
 		int chapter = 0;
 		int verse = -1;
@@ -717,7 +717,7 @@ partial class Program
 		src = Regex.Replace(src, @"(?<=(^|\n))[ \t]+(\^[0-9]+\^|@[0-9]+)", "$2", RegexOptions.Singleline);
 
 		// hack because of bad output
-		// remove empty line after ## title
+		// remove empty lines after ## title
 		src = Regex.Replace(src, @"(?<=(^|\n)##[^\r\n]*?\r?\n)([ \t]*\r?\n)+", "", RegexOptions.Singleline);
 		// remove multiple emtpy lines
 		src = Regex.Replace(src, @"(?<=(^|\n))([ \t]*\r?\n)+[ \t]*(?=\r?\n)", "", RegexOptions.Singleline);

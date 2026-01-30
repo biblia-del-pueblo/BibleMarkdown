@@ -50,7 +50,7 @@ public class  Outline: List<OutlineItem>
             Map = new VerseMaps().Import(mapfile);
         }
 
-        var books = Regex.Matches(frame, @"(^|\n)#\s+(?<book>.*?)[ \t]*\r?\n(?<bookbody>.*?)(?=\r?\n#\s|$)", RegexOptions.Singleline)
+        var books = Regex.Matches(frame, @"(^|\n)#\s+(?<book>.*?)[ \t]*\r?\n(?<bookbody>.*?)(?=[ \t\r\n]*\r?\n#\s|$)", RegexOptions.Singleline)
             .Select(match => new
             {
                 Name = Books.Name(match.Groups["book"].Value),
