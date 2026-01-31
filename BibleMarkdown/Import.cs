@@ -809,9 +809,10 @@ partial class Program
 			var sb = new StringBuilder();
             var phrase = new StringBuilder();
             int chapterno = 1;
-			int verseno = 1;
+			int verseno;
 			foreach (var chapter in book.Value as JArray)
 			{
+				verseno = 1;
 				sb.AppendLine($"# {chapterno++}");
 				foreach (var versetoken in chapter as JArray) {
 					string verse;
