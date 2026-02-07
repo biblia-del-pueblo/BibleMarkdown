@@ -286,22 +286,8 @@ normal pandoc Markdown, with the following extensions:
 To edit the Markdown of the Bibles, you can use a normal editor like Typora,
 stackedit.io or VisualStudio Code.
 
-Bibmark processes all the .md files in the current directory and converts them to
-other formats in the ""out"" subdirectory. The md files in the current directory must
-follow a naming schema, of two digits followed by a minus and the name of the
-bible book, e.g. like 01-Genesis.md or 02-Exodus.md. Bibmark only processes files
-with names adhering to that schema. The md files can be constructed from various
-source formats. For this, the source files must be placed in the subdirectory ""src"".
-In the ""src"" subdirectory you can place USFM files or zefania xml files, or a BibleEdit
-folder. You can also place a script.cs file in the ""src"" folder that will be executed
-when running bibmark, that can configure bibmark for certain tasks. Next you can
-place a file booknames.xml in the ""src"" subdirectory that contains names of Bible
-books in different languages. The names of the books should correspond to the titles
-of the books in the USFM files. Then you can also import a Parallel Verses file,
-linklist.xml, that contains parallel verses.
-
 If you have the source text of your Bible in USFM markup, you can place
-those files in a subfolder src. If you specify the -s argument to bibmark,
+those files in a subfolder 'src'. If you specify the -s argument to bibmark,
 bibmark searches this folder for USFM source and creates Bible Markdown
 files in the main folder if the source files are newer than the Bible Markdown
 files. Instead of USFM you can also place a Zefania XML file or a BibleEdit
@@ -335,19 +321,19 @@ You can also change the versification of the .outline.md files by putting a
 the BibleFramework root node in outline.xml.
 You then put a verse mapping in the file versification.map.md.
 The syntax of the verse mapping md file is as follows:
-```
+
 # <book>
 <chapter>:<verse>=><tochapter>:<toverse> <chapter2>:<verse2>=><tochapter2>:<toverse2> ...
 
 # <book2>
 <mappings as above> ...
 ...
-```
+
 For example the following
-```
+
 # Números
 12:16=>13:1 13:1=>13:2 13:33=>13:33
-```
+
 will point 12:16 to 13:1 and then all verses one up, until verse 13:33.
 You can create the mapping files by comparing the verseinfo.md (see below) 
 files of the different bibles via the diff tool.
