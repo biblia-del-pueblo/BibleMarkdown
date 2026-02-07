@@ -49,8 +49,7 @@ You can also place a script.cs file in the `src` folder that will be executed
 when running bibmark, that can configure bibmark for certain tasks. Next you can
 place a file booknames.xml in the `src` subdirectory that contains names of Bible
 books in different languages. The names of the books should correspond to the titles
-of the books in the USFM files. Then you can also import a Parallel Verses file,
-linklist.xml, that contains parallel verses.
+of the books in the USFM files.
 
 bibmark also creates a file called outline.md & outline.xml in the out folder that
 specifies chapter titles, paragraphs and footnotes. If you move this file to the
