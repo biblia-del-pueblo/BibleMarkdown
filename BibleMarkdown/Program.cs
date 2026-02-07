@@ -385,6 +385,8 @@ Options:
   - -twolanguage path1 path2
     Produces a double column, two language bible, with the single language bibles
     located in path1 and path2.
+  - -strongs
+    Import Strong number syntax from USFM files.
   ");
     }
 
@@ -451,6 +453,7 @@ Options:
         LowercaseFirstWords = args.Contains("-plc");
         EachVerseOnNewLine = !args.Contains("-cp");
         FromSource = args.Contains("-s") || args.Contains("-src") || args.Contains("-source");
+        ImportStrongs = args.Contains("-strongs");
         var lnpos = Array.IndexOf(args, "-ln");
         if (lnpos >= 0 && (lnpos + 1 < args.Length)) Language = args[lnpos + 1];
         else Language = "default";
