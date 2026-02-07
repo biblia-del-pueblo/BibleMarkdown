@@ -267,13 +267,12 @@ Bibmark converts Markdown files to various formats.
 The Bibles use a specific version of Markdown, BibleMarkdown. BibleMarkdown is
 normal pandoc Markdown, with the following extensions:
 
-Bible Markdown is normal pandoc Markdown with the following extensions:
 - For Footnotes you can make them more readable, by placing a marker ^label^
    at the place of the footnote, but specifying the footnote later in the text with
    ordinary ^label^[Footnote] markdown. ""label"" must be a letter or word
    without any digits.
-- You can have comments by bracing them with /\* and \*/ or by leading with
-   // until the end of the line. /\* \*/ Comments can span multiple lines.
+- You can have comments by bracing them with /* and */ or by leading with
+   // until the end of the line. /* */ Comments can span multiple lines.
 - Verse numbers are denoted with a @ character followed by a number, like
    this: @1 In the beginning was the Word and the Word was with God and the Word was God. @2 This was in the beginning...
 - if the text contains the comment //!verse-paragraphs, each verse is rendered
