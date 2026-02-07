@@ -286,17 +286,30 @@ normal pandoc Markdown, with the following extensions:
 To edit the Markdown of the Bibles, you can use a normal editor like Typora,
 stackedit.io or VisualStudio Code.
 
-If you have the source text of your Bible in USFM markup, you can place
-those files in a subfolder 'src'. If you specify the -s argument to bibmark,
-bibmark searches this folder for USFM source and creates Bible Markdown
-files in the main folder if the source files are newer than the Bible Markdown
-files. Instead of USFM you can also place a Zefania XML file or a BibleEdit
-or a Javascripture file/folder in the src folder. You can also place a folder 'bibmark'
-containing .md files that will be copied to the main folder. That way
-you can placce a git submodule in the src/bibmark folder containing BibleMarkdown.
+Bibmark processes all the .md files in the current directory and converts them to
+other formats in the ""out"" subdirectory. The md files in the current directory must
+follow a naming schema, of a real number followed by a minus and the name of the
+bible book, e.g. like 01-Genesis.md or 02-Exodus.md. Bibmark only processes files
+with names adhering to that schema. The md files can be constructed from various
+source formats.
 From the Bible Markdown files, bibmark creates Pandoc files in the
 out/pandoc folder, LaTeX files in the out/tex folder, HTML files in the
 out/html folder and USFM files in the out/usfm folder.
+
+If you have the source text of your Bible in USFM markup, you can place
+those files in a subfolder ""src"". If you specify the -s argument to bibmark,
+bibmark searches this folder for USFM source and creates Bible Markdown
+files in the main folder if the source files are newer than the Bible Markdown
+files. Instead of USFM you can also place a Zefania XML file or a BibleEdit
+or a Javascripture file/folder in the src folder. You can also place a folder ""bibmark""
+containing .md files that will be copied to the main folder. That way
+you can placce a git submodule in the src/bibmark folder containing BibleMarkdown.
+You can also place a script.cs file in the ""src"" folder that will be executed
+when running bibmark, that can configure bibmark for certain tasks. Next you can
+place a file booknames.xml in the ""src"" subdirectory that contains names of Bible
+books in different languages. The names of the books should correspond to the titles
+of the books in the USFM files. Then you can also import a Parallel Verses file,
+linklist.xml, that contains parallel verses.
 
 bibmark also creates a file called outline.md & outline.xml in the out folder that
 specifies chapter titles, paragraphs and footnotes. If you move this file to the
