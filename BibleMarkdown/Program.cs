@@ -24,6 +24,7 @@ partial class Program
 
     public static DateTime bibmarktime;
     public static bool LowercaseFirstWords = false;
+    public static bool ImportStrongs = false;
     public static bool EachVerseOnNewLine = true;
     public static bool FromSource = false;
     public static bool Imported = false;
@@ -149,12 +150,14 @@ partial class Program
         var md = Path.Combine(path, "out", "pandoc");
         var mdtex = Path.Combine(md, "tex");
         var mdepub = Path.Combine(md, "epub");
+        var mdusfm = Path.Combine(md, "usfm");
         var tex = Path.Combine(path, "out", "tex");
         var html = Path.Combine(path, "out", "html");
         var usfm = Path.Combine(path, "out", "usfm");
         if (!Directory.Exists(md)) Directory.CreateDirectory(md);
         if (!Directory.Exists(mdtex)) Directory.CreateDirectory(mdtex);
         if (!Directory.Exists(mdepub)) Directory.CreateDirectory(mdepub);
+        if (!Directory.Exists(mdusfm)) Directory.CreateDirectory(mdusfm);
         if (!Directory.Exists(tex)) Directory.CreateDirectory(tex);
         if (!Directory.Exists(html)) Directory.CreateDirectory(html);
         if (!Directory.Exists(usfm)) Directory.CreateDirectory(usfm);

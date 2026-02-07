@@ -169,7 +169,37 @@ partial class Program
 					} while (replaced);
 
 					src = Regex.Replace(src, @"\\p[ \t]*", $"{Environment.NewLine}{Environment.NewLine}"); // replace new paragraph with empty line
-					src = Regex.Replace(src, @"\|([a-zA-Z-]+=""[^""]*""\s*)+", ""); // remove word attributes
+
+                    if (ImportStrongs)
+                    {
+                        src = Regex.Replace(src, @"\\w(.*?)\\w\*", m =>
+                        {
+                            var word = m.Groups[1].Value;
+                            var param = Regex.Match(word, @"(.*?)\|(.*)");
+                            if (param.Success)
+                            {
+                                word = param.Groups[1].Value;
+                                var p = $" {param.Groups[2].Value}";
+
+                                var strongs = Regex.Matches(p, @" strong\s*=\s*""(\s*[A-Z][0-9]+)+\s*""")
+                                    .SelectMany(m => m.Groups[1].Value.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+                                var morph = Regex.Match(p, @" morph\s*=\s*""([^""]+)""");
+                                var lemma = Regex.Match(p, @" lemma\s*=\s*""([^""]+)""");
+
+                                var tokens = new List<string>();
+
+                                tokens.AddRange(word.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+                                if (lemma.Success) tokens.Add($"&{lemma.Groups[1].Value}");
+                                tokens.AddRange(strongs);
+                                if (morph.Success) tokens.Add($"%{morph.Groups[1].Value}");
+
+                                return string.Join('_', tokens);
+                            }
+                            return m.Value;
+                        }, RegexOptions.Singleline);
+                    }
+
+                    src = Regex.Replace(src, @"\|([a-zA-Z-]+=""[^""]*""\s*)+", ""); // remove word attributes
 					src = Regex.Replace(src, @"\\em\s*(.*?)\s*\\em\*", "*$1*", RegexOptions.Singleline); // italics
 					src = Regex.Replace(src, @"\\bd\s*(.*?)\s*\\bd\*", "**$1**", RegexOptions.Singleline); // bold
 					src = Regex.Replace(src, @"\\it\s*(.*?)\s*\\it\*", "*$1*", RegexOptions.Singleline); //italics
@@ -180,7 +210,6 @@ partial class Program
 					{
 						return match.Value.ToUpper();
 					}, RegexOptions.Singleline); // name of God
-
                     src = Regex.Replace(src, @"\\\+?\w+(\*|[ \t]*)?", "", RegexOptions.Singleline); // remove usfm tags
 					src = Regex.Replace(src, @" +", " "); // remove multiple spaces
 					src = Regex.Replace(src, @"\^\[([0-9]+)[.,:]([0-9]+)", "^[**$1:$2**"); // bold verse references in footnotes
