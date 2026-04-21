@@ -211,14 +211,15 @@ partial class Program
             {
                 var xchapter = new XElement(ns + "chapter", new XAttribute("osisID", $"{bookname}.{chapter.Index}"));
                 xbook.Add(xchapter);
-                var tokens = Regex.Matches(chapter.Text, @"((?<=^|\n)##\s*(?<title>.*?(?=\r?\n|$))|(?<=(?:(?<=^|\n)#.*?\r?\n\s*)|^\s*)(?!\^[0-9]+\^|@[0-9]+)(?<preamble>.*?)(?=(\^[0-9]+\^|@[0-9]+|(?<=^|\n)#|$))|(?:\^(?<verse1>[0-9]+)\^|@(?<verse2>[0-9]+))(?<text>.*?)(?=(\^[0-9]+\^|@[0-9]+|(?<=^|\n)#|$)))", RegexOptions.Singleline)
+                var tokens = Regex.Matches(chapter.Text, @"((?<=^|\n)##\s*(?<title>.*?(?=\r?\n|$))|(?<=^|\n)(?<paragraph>[ \t]*\r?\n)|(?<=(?:(?<=^|\n)#.*?\r?\n\s*)|^\s*)(?!\^[0-9]+\^|@[0-9]+)(?<preamble>.*?)(?=(\^[0-9]+\^|@[0-9]+|(?<=^|\n)#|$))|(?:\^(?<verse1>[0-9]+)\^|@(?<verse2>[0-9]+))(?<text>.*?)(?=\s*(\^[0-9]+\^|@[0-9]+|(?<=^|\n)#|$)))", RegexOptions.Singleline)
                     .Select(match => new
                     {
                         Title = match.Groups["title"].Success ? match.Groups["title"].Value : null,
                         VerseNumber = match.Groups["verse1"].Success ? match.Groups["verse1"].Value :
                             match.Groups["verse2"].Success ? match.Groups["verse2"].Value : null,
-                        VerseText = match.Groups["text"].Success ? match.Groups["text"].Value : null,
-                        Preamble = match.Groups["preamble"].Success ? match.Groups["preamble"].Value : null
+                        VerseText = match.Groups["text"].Success ? match.Groups["text"].Value.Trim() : null,
+                        Paragraph = match.Groups["paragraph"].Success,
+                        Preamble = match.Groups["preamble"].Success ? match.Groups["preamble"].Value.Trim() : null
                     });
 
                 void AddStyle(XElement xml, string text)
@@ -264,6 +265,7 @@ partial class Program
                     }
                 }
 
+                XElement xparagraph = new XElement(ns + "p");
                 foreach (var token in tokens)
                 {
                     if (token.Title != null)
@@ -274,17 +276,24 @@ partial class Program
                     }
                     else if (token.VerseNumber != null)
                     {
-                        var xverse = new XElement(ns + "verse", new XAttribute("osisID", $"{bookname}.{chapter.Index}.{token.VerseNumber}"), token.VerseText);
+                        var xverse = new XElement(ns + "verse", new XAttribute("osisID", $"{bookname}.{chapter.Index}.{token.VerseNumber}"));
                         AddText(xverse, token.VerseText);
-                        xchapter.Add(xverse);
+                        xparagraph.Add(xverse);
                     }
                     else if (!string.IsNullOrEmpty(token.Preamble))
                     {
                         var xpreamble = new XElement(ns + "p");
                         AddText(xpreamble, token.Preamble);
-                        xchapter.Add(xpreamble);
+                        xparagraph.Add(xpreamble);
+                    }
+                    else if (token.Paragraph)
+                    {
+                        if (xparagraph.HasElements) xchapter.Add(xparagraph);
+                        xparagraph = new XElement(ns + "p");
                     }
                 }
+
+                if (xparagraph.HasElements) xchapter.Add(xparagraph);
             }
         }
 
