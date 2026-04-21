@@ -68,8 +68,11 @@ public class Pandoc
 			var ver = Regex.Match(Version(), "[0-9\\.]+");
 			if (ver.Success && System.Version.TryParse(ver.Value, out version))
 			{
-				// if version < 3.8.2 use internal pandoc
-				if (version.Major < 3 || version.Major == 3 && (version.Minor < 8 || version.Minor == 8 && version.Build < 2)) {
+				// if version < 3.9.0.2 use internal pandoc
+				if (version.Major < 3 || version.Major == 3 &&
+					(version.Minor < 9 || version.Minor == 9 &&
+					(version.Build < 0 || version.Build == 0 &&
+					version.Revision < 2))) {
 					path = null; // use internal pandoc
 				}
 			}
