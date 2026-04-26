@@ -677,7 +677,7 @@ partial class Program
         txt = Regex.Replace(txt, @"\^\[\s*(?<footpos>[0-9]+[:,][0-9]+)\s*(?<foottext>.*?)\s*\]", @"\f + \fr ${footpos} \ft ${foottext} \f*", RegexOptions.Singleline);
         txt = Regex.Replace(txt, @"(\r?\n)([ \t]*)(\r?\n)", @"$1\p$3", RegexOptions.Singleline); // paragraphs
         var header = Regex.Match(usfm, @"^.*?(?=\s*\\c)", RegexOptions.Singleline).Value.Trim();
-        txt = header + Environment.NewLine + Environment.NewLine + txt;
+        if (!string.IsNullOrWhiteSpace(header)) txt = header + Environment.NewLine + Environment.NewLine + txt;
 
         File.WriteAllText(usfmfile, txt);
         LogFile(usfmfile);
