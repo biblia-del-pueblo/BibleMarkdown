@@ -1,7 +1,8 @@
 SET /p ApiKey=<NugetApiKey.txt
 
 cd nupkg
-del /Q *.*
+del /Q *.nupkg
+del /Q *.snupkg
 
 cd ..\BibleMarkdown
 dotnet pack
