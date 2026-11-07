@@ -7,6 +7,6 @@
         <PackageVersion Include="CliWrap" Version="3.4.4" />
         <PackageVersion Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="5.9.0" />
         <PackageVersion Include="Newtonsoft.Json" Version="13.0.4" />
-        <PackageVersion Include="EstrellasDeEsperanza.AsnycLock" Version="4.2.1" />
+        <PackageVersion Include="EstrellasDeEsperanza.AsyncLock" Version="4.2.1" />
     </ItemGroup>
 </Project>
