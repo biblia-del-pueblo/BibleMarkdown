@@ -18,14 +18,14 @@ namespace BibleMarkdown;
 partial class Program
 {
 
-    static string CleanStrongs(string text)
+    public static string CleanStrongs(string text)
     {
         text = Regex.Replace(text, @"(?<=[\p{L}\p{M}]+)_(?=(?![GH][0-9]+|&[\p{L}\p{M}]+|%[0-9a-zA-Z-]+)[\p{L}\p{M}]+)", " ");
         text = Regex.Replace(text, @"(?<=[&%-0-9\p{L}\p{M}]+)_([GH][0-9]+|&[\p{L}\p{M}]+|%[0-9a-zA-Z-]+)", "");
         return text;
     }
 
-    static string UsfmStrongs(string text)
+    public static string UsfmStrongs(string text)
     {
         return Regex.Replace(text, @"[\p{L}\p{M}]+(_[%&\p{Nd}\p{L}\p{M}-]+)+", match =>
         {
@@ -56,7 +56,7 @@ partial class Program
         });
     }
 
-    static void CreatePandoc(string file, string panfile)
+    public static void CreatePandoc(string file, string panfile)
     {
         if ((Output & (Outputs.Pandoc | Outputs.USFM | Outputs.TeX | Outputs.Epub | Outputs.Html)) == Outputs.None ||
             IsNewer(panfile, file)) return;

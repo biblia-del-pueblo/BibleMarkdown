@@ -542,6 +542,111 @@ partial class Program
 		}
 	}
 
+	/// <summary>
+	/// Imports a Bible module of The SWORD Project. Place the module in the src folder, as the folders mods.d (with the
+	/// .conf file of the module) and modules (with its data), or as the zip file of the module, which is unpacked first.
+	/// The module is read directly, no SWORD tools are needed. The drivers zText, zText4, RawText and RawText4 are
+	/// supported (compressed with ZIP or LZSS, in UTF-8 or Latin-1), and the markup OSIS, GBF, ThML or Plain.
+	/// Any versification works: KJV is built in, and for every other one the structure of books, chapters and verses
+	/// is read from the module itself, which works for OSIS modules made with osis2mod (they mark their books and
+	/// chapters). Footnotes, headings, paragraphs, poetry lines, italics and the words of Jesus are kept.
+	/// </summary>
+	public static void ImportFromSWORD(string mdpath, string srcpath)
+	{
+		if (!FromSource) return;
+
+		var confpath = Path.Combine(srcpath, "mods.d");
+		if (!Directory.Exists(confpath)) return;
+		var confs = Directory.EnumerateFiles(confpath, "*.conf").Order().ToList();
+		if (confs.Count == 0) return;
+		if (confs.Count > 1) Log($"There are several SWORD modules in {confpath}, only {Path.GetFileName(confs[0])} is imported.");
+
+		try
+		{
+			var module = SwordModule.Open(confs[0], srcpath);
+			var versification = module.Versification;
+			Log($"Import from SWORD module {module.Name} (versification {versification.Name})");
+
+			foreach (var book in versification.Books)
+			{
+				if (!module.Has(book.NewTestament)) continue;
+
+				var text = new StringBuilder();
+				var nl = Environment.NewLine;
+
+				for (int chapter = 1; chapter <= book.Chapters; chapter++)
+				{
+					int notes = 0; // the footnotes are lettered a, b, c... in every chapter
+					string NextLabel() => Label(notes++);
+
+					var verses = new List<(int Number, SwordVerse Verse)>();
+					for (int number = 1; number <= book.Verses[chapter - 1]; number++)
+					{
+						var raw = module.Read(book.NewTestament, versification.Index(book, chapter, number));
+						if (raw.Length == 0) continue;
+						var verse = SwordMarkup.Convert(raw, module.SourceType, NextLabel, ImportStrongs);
+						if (verse.Text.Length > 0) verses.Add((number, verse)); // empty verses are removed, as the import of USFM does
+					}
+					if (verses.Count == 0) continue;
+
+					// The entry of verse 0 is the heading of the chapter: its titles and an introduction.
+					var heading = SwordMarkup.Convert(module.Read(book.NewTestament, versification.Index(book, chapter, 0)),
+						module.SourceType, NextLabel, ImportStrongs);
+
+					if (text.Length > 0) text.Append(nl).Append(nl);
+					text.Append($"# {chapter}{nl}");
+					foreach (var title in heading.Titles) text.Append($"## {title}{nl}");
+					if (heading.Text.Length > 0) text.Append($"*{heading.Text}* \\{nl}"); // like the verse 0 of the import of USFM
+
+					bool first = true;
+					foreach (var (number, verse) in verses)
+					{
+						if (verse.Titles.Count > 0)
+						{
+							if (!first) text.Append(nl).Append(nl);
+							foreach (var title in verse.Titles) text.Append($"## {title}{nl}");
+						}
+						else if (!first)
+						{
+							// a new paragraph is an empty line
+							if (verse.Paragraph) text.Append(nl).Append(nl);
+							else if (EachVerseOnNewLine) text.Append(nl);
+							else text.Append(' ');
+						}
+						if (verse.Psalm != null) text.Append($"*{verse.Psalm}* \\{nl}"); // the title of a psalm is verse 0
+
+						text.Append($"@{number} "); // the verse style of Bible Markdown (^1^ is legacy)
+						text.Append(verse.Text);
+						foreach (var (label, note) in verse.Notes) text.Append($" ^{label}^[{note}]"); // the footnotes follow their verse
+						first = false;
+					}
+				}
+				if (text.Length == 0) continue;
+
+				var name = string.Concat(SwordBookName(book).Select(ch => Path.GetInvalidFileNameChars().Contains(ch) ? '_' : ch));
+				var md = Path.Combine(mdpath, $"{book.Number:D2}-{name}.md");
+				File.WriteAllText(md, Regex.Replace(text.ToString(), @"\r?\n", nl));
+				Imported = true;
+				LogFile(md);
+			}
+		}
+		catch (Exception ex) when (ex is NotSupportedException or InvalidDataException or IOException)
+		{
+			Log($"The SWORD module {Path.GetFileName(confs[0])} cannot be imported: {ex.Message}");
+		}
+	}
+
+	/// <summary>The name of a book: from booknames.xml in the src folder if there is one, else the English name.</summary>
+	static string SwordBookName(SwordVersification.Book book)
+	{
+		if (Language != null && Books.TryGetValue(Language, out var names))
+		{
+			var named = names.Values.FirstOrDefault(b => b.Number == book.Number);
+			if (named != null && !string.IsNullOrWhiteSpace(named.Name)) return named.Name;
+		}
+		return book.Name;
+	}
+
 	public static Outline ReadOutlines(string path)
 	{
 		Outline items = new Outline();

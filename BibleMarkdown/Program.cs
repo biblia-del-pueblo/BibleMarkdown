@@ -208,6 +208,7 @@ partial class Program
             ImportFromTXT(path, srcpath);
             ImportFromZefania(path, srcpath);
             ImportFromXmlOther(path, srcpath);
+            ImportFromSWORD(path, srcpath);
             ImportJavascripture(path, srcpath);
             ImportFromBibleMarkdown(path, srcpath);
             ImportParallelVerses(path);
@@ -321,7 +322,11 @@ those files in a subfolder ""src"". If you specify the -s argument to bibmark,
 bibmark searches this folder for USFM source and creates Bible Markdown
 files in the main folder if the source files are newer than the Bible Markdown
 files. Instead of USFM you can also place a Zefania XML file or a BibleEdit
-or a Javascripture file/folder in the src folder. You can also place a folder ""bibmark""
+or a Javascripture file/folder in the src folder, or a Bible module of The SWORD Project
+(its folders mods.d and modules, or its zip file), which is read directly, without any
+SWORD tools. Supported are the zText and RawText modules, with any versification as
+long as it is KJV or the module marks its books and chapters (as modules made with osis2mod do).
+You can also place a folder ""bibmark""
 containing .md files that will be copied to the main folder. That way
 you can placce a git submodule in the src/bibmark folder containing BibleMarkdown.
 You can also place a script.cs file in the ""src"" folder that will be executed
@@ -403,7 +408,7 @@ Options:
     Produces a double column, two language bible, with the single language bibles
     located in path1 and path2.
   - -strongs
-    Import Strong number syntax from USFM files.
+    Import Strong number syntax from USFM files and SWORD modules.
   ");
     }
 

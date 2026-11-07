@@ -42,7 +42,14 @@ those files in a subfolder `src`. If you specify the -s argument to bibmark,
 bibmark searches this folder for USFM source and creates Bible Markdown
 files in the main folder if the source files are newer than the Bible Markdown
 files. Instead of USFM you can also place a Zefania XML file or a BibleEdit
-or a Javascripture file/folder in the src folder. You can also place a folder `bibmark`
+or a Javascripture file/folder in the src folder, or a Bible module of The SWORD Project
+(its folders `mods.d` and `modules`, or its zip file), which is read directly, without any
+SWORD tools. Supported are the zText and RawText modules (compressed with ZIP or LZSS)
+with the markup OSIS, GBF, ThML or Plain. The versification can be any: KJV is built in,
+and for another one the books, chapters and verses are read from the module itself, as long
+as it marks them (as OSIS modules made with osis2mod do); footnotes, headings,
+paragraphs, italics and the words of Jesus are kept, and with `-strongs` also the Strong
+numbers. You can also place a folder `bibmark`
 containing .md files that will be copied to the main folder. That way
 you can placce a git submodule in the src/bibmark folder containing BibleMarkdown.
 You can also place a script.cs file in the `src` folder that will be executed
