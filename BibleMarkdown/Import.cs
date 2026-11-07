@@ -10,6 +10,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System.Security.Cryptography.X509Certificates;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using System.IO.Compression;
 
 namespace BibleMarkdown;
 
@@ -550,12 +551,21 @@ partial class Program
 	/// Any versification works: KJV is built in, and for every other one the structure of books, chapters and verses
 	/// is read from the module itself, which works for OSIS modules made with osis2mod (they mark their books and
 	/// chapters). Footnotes, headings, paragraphs, poetry lines, italics and the words of Jesus are kept.
+	/// With <paramref name="importBooknames"/>, the names of the books are read from the headings of the books in the
+	/// module and written to booknames.xml in the src folder (an existing file is kept), and the books are named by
+	/// them. A book whose heading has no usable name keeps its English name.
 	/// </summary>
-	public static void ImportFromSWORD(string mdpath, string srcpath)
+	public static void ImportFromSWORD(string mdpath, string srcpath, bool importBooknames = false)
 	{
 		if (!FromSource) return;
 
-		var confpath = Path.Combine(srcpath, "mods.d");
+        var confpath = Path.Combine(srcpath, "mods.d");
+        var zip = Directory.EnumerateFiles(srcpath, "*.zip").FirstOrDefault();
+		if (zip != null && !Directory.Exists(confpath))
+		{
+			ZipFile.ExtractToDirectory(zip, srcpath);
+		}
+
 		if (!Directory.Exists(confpath)) return;
 		var confs = Directory.EnumerateFiles(confpath, "*.conf").Order().ToList();
 		if (confs.Count == 0) return;
@@ -566,6 +576,9 @@ partial class Program
 			var module = SwordModule.Open(confs[0], srcpath);
 			var versification = module.Versification;
 			Log($"Import from SWORD module {module.Name} (versification {versification.Name})");
+
+			var localNames = importBooknames ? SwordBookNames(module, versification) : null;
+			if (localNames != null) WriteSwordBooknames(module, versification, localNames, srcpath);
 
 			foreach (var book in versification.Books)
 			{
@@ -623,7 +636,7 @@ partial class Program
 				}
 				if (text.Length == 0) continue;
 
-				var name = string.Concat(SwordBookName(book).Select(ch => Path.GetInvalidFileNameChars().Contains(ch) ? '_' : ch));
+				var name = string.Concat((localNames != null && localNames.TryGetValue(book.Number, out var local) ? local.Name : SwordBookName(book)).Select(ch => Path.GetInvalidFileNameChars().Contains(ch) ? '_' : ch));
 				var md = Path.Combine(mdpath, $"{book.Number:D2}-{name}.md");
 				File.WriteAllText(md, Regex.Replace(text.ToString(), @"\r?\n", nl));
 				Imported = true;
@@ -634,6 +647,94 @@ partial class Program
 		{
 			Log($"The SWORD module {Path.GetFileName(confs[0])} cannot be imported: {ex.Message}");
 		}
+	}
+
+	/// <summary>
+	/// The names of the books as the module itself gives them, by book number. The name is the short name of the title
+	/// in the heading of the book (its <c>short</c> attribute, "1. Mose"), or the title when there is none; the
+	/// description is the title ("Das 1. Buch Mose (Genesis)"). The abbreviation is made from the name, see
+	/// <see cref="Abbreviate"/>. Books without a usable title are left out.
+	/// </summary>
+	static Dictionary<int, (string Name, string Abbreviation, string Description)> SwordBookNames(SwordModule module, SwordVersification versification)
+	{
+		var titles = new List<(int Number, string Name, string Description)>();
+		foreach (var book in versification.Books)
+		{
+			if (!module.Has(book.NewTestament)) continue;
+			try
+			{
+				var raw = module.Read(book.NewTestament, versification.Index(book, 0, 0));
+				var heading = SwordMarkup.Convert(raw, module.SourceType, () => "", false);
+				// the first book of a testament also has the title of the testament before its own
+				var title = heading.Titles.Select(t => Regex.Replace(t, @"\s+", " ").Trim()).LastOrDefault(t => t.Length > 0);
+				if (title == null || title.Length > 60) continue;
+				// The converted heading has no attributes: the short name is read from the markup (OSIS: <title short="...">).
+				var shortName = Regex.Match(raw, @"<title\s[^>]*?short=""([^""]*)""", RegexOptions.IgnoreCase);
+				var name = shortName.Success ? System.Net.WebUtility.HtmlDecode(shortName.Groups[1].Value).Trim() : "";
+				if (name.Length == 0 || name.Length > 60) name = title;
+				if (titles.Any(t => t.Name == name)) name = title; // not unique: the title tells the books apart
+				if (titles.Any(t => t.Name == name)) continue;
+				titles.Add((book.Number, name, title));
+			}
+			catch (Exception ex) when (ex is NotSupportedException or InvalidDataException or IOException or ArgumentException)
+			{
+				Log($"No book name for {book.Name} in the SWORD module: {ex.Message}");
+			}
+		}
+
+		// The shortest abbreviation that is unique: 3 letters ("Mat"), longer for names that start alike.
+		var names = new Dictionary<int, (string Name, string Abbreviation, string Description)>();
+		for (int letters = 4; ; letters++)
+		{
+			var abbreviations = titles.Select(t => (t.Number, Abbreviation: Abbreviate(t.Name, letters))).ToList();
+			var duplicates = abbreviations.GroupBy(a => a.Abbreviation).Where(g => g.Count() > 1).Select(g => g.Key).ToHashSet();
+			foreach (var t in titles)
+			{
+				var abbreviation = abbreviations.First(a => a.Number == t.Number).Abbreviation;
+				if (!duplicates.Contains(abbreviation) || letters >= 8)
+					names.TryAdd(t.Number, (t.Name, abbreviation, t.Description));
+			}
+			if (names.Count == titles.Count) break;
+		}
+		return names;
+	}
+
+	/// <summary>
+	/// An abbreviation of a book name: its number ("1. Mose" has "1") and the first letters of its name, 3 in all
+	/// ("1Mo", "Mat"; "Matthäus" is "Mat"). More letters make longer abbreviations for names that start alike.
+	/// </summary>
+	static string Abbreviate(string name, int length)
+	{
+		var number = Regex.Match(name, @"^\s*([0-9]+)\.?\s*");
+		var prefix = number.Success ? number.Groups[1].Value : "";
+		var letters = string.Concat(name[number.Length..].Where(char.IsLetter));
+		if (letters.Length == 0) return prefix.Length > 0 ? prefix : name;
+		int count = Math.Max(1, length - prefix.Length);
+		var abbreviation = prefix + char.ToUpperInvariant(letters[0]) + letters[1..Math.Min(letters.Length, count)].ToLowerInvariant();
+		return abbreviation;
+	}
+
+	/// <summary>
+	/// Writes booknames.xml in the src folder: the English names (with the OSIS ids) and the names of the module, which
+	/// the reader matches by book number. An existing file is not overwritten.
+	/// </summary>
+	static void WriteSwordBooknames(SwordModule module, SwordVersification versification, Dictionary<int, (string Name, string Abbreviation, string Description)> names, string srcpath)
+	{
+		var file = Path.Combine(srcpath, "booknames.xml");
+		if (File.Exists(file)) { Log("booknames.xml exists already, it is kept."); return; }
+		var books = versification.Books.Where(b => module.Has(b.NewTestament)).ToList();
+		var language = string.IsNullOrWhiteSpace(module.Name) ? "module" : module.Name;
+		var xml = new XElement("BOOKNAMES",
+			new XAttribute("default", language),
+			new XElement("ID", new XAttribute("descr", "English"),
+				books.Select(b => new XElement("BOOK", new XAttribute("bnumber", b.Number), new XAttribute("bshort", b.OsisId), b.Name))),
+			new XElement("ID", new XAttribute("descr", language),
+				books.Select(b => names.TryGetValue(b.Number, out var local)
+					? new XElement("BOOK", new XAttribute("bnumber", b.Number), new XAttribute("bshort", local.Abbreviation),
+						new XAttribute("desc", local.Description), local.Name)
+					: new XElement("BOOK", new XAttribute("bnumber", b.Number), new XAttribute("bshort", ""), b.Name))));
+		xml.Save(file);
+		Log($"Created {file} with {names.Count} book names and abbreviations from the SWORD module.");
 	}
 
 	/// <summary>The name of a book: from booknames.xml in the src folder if there is one, else the English name.</summary>
