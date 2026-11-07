@@ -65,9 +65,6 @@
         </None>
     </ItemGroup>
 
-    <ItemGroup>
-        <Folder Include="nupkg\" />
-    </ItemGroup>
 
     <ItemGroup>
         <None Update="runtimes\linux-arm64\pandoc">
