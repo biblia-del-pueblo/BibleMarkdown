@@ -1,7 +1,8 @@
 <Solution>
   <Folder Name="/Global/">
     <File Path=".gitignore" />
-    <File Path="PushToNuget.bat" />
+    <File Path="pack.bat" />
+    <File Path="push-to-nuget.bat" />
   </Folder>
   <Project Path="BibleMarkdown.Msi/BibleMarkdown.Msi.vdproj" Type="Installer">
     <Build />

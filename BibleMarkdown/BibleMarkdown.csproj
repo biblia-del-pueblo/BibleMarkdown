@@ -1,38 +1,39 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<OutputType>Exe</OutputType>
-		<TargetFramework>net10.0</TargetFramework>
+        <PackAsTool Condition="$(PackAsTool) == ''">false</PackAsTool>
+
+        <OutputType Condition="$(PackAsTool) == 'true'">Exe</OutputType>
+        <OutputType Condition="$(PackAsTool) != 'true'">Library</OutputType>
+        <TargetFramework>net10.0</TargetFramework>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
-		<StartupObject>BibleMarkdown.Program</StartupObject>
+        <StartupObject Condition="$(PackAsTool) == 'true'">BibleMarkdown.Program</StartupObject>
 		<!--<GenerateAssemblyInfo>false</GenerateAssemblyInfo>-->
 		<Deterministic>true</Deterministic>
         <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
 		<AssemblyName>bibmark</AssemblyName>
 
-		<PackageId>BibleMarkdown</PackageId>
-		<Title>BibleMarkdown</Title>
+        <PackageId Condition="$(PackAsTool) == 'true'">BibleMarkdown</PackageId>
+        <PackageId Condition="$(PackAsTool) != 'true'">BibleMarkdown.Library</PackageId>
+        <Title>BibleMarkdown</Title>
 		<Authors>simonegli8</Authors>
 		<Company>Biblia del Pueblo</Company>
 		<Product>BibleMarkdown</Product>
 		<Description>A Markdown converter tailored for creation of Bibles</Description>
 		<Copyright>Estrellas de Esperanza © 2026</Copyright>
 		<PackageProjectUrl>https://github.com/biblia-del-pueblo/BibleMarkdown</PackageProjectUrl>
-		<PackageReadmeFile>tools/net10.0/any/README.md</PackageReadmeFile>
-		<RepositoryUrl>https://github.com/biblia-del-pueblo/BibleMarkdown</RepositoryUrl>
+        <PackageReadmeFile Condition="$(PackAsTool) == 'true'">tools/net10.0/any/README.md</PackageReadmeFile>
+        <PackageReadmeFile Condition="$(PackAsTool) != 'true'">README.md</PackageReadmeFile>
+        <RepositoryUrl>https://github.com/biblia-del-pueblo/BibleMarkdown</RepositoryUrl>
 		<RepositoryType>git</RepositoryType>
 		<PackageTags>OpenSource, Bible, Bibles, Public Domain, Biblia, Markdown, Bible Markdown, Bible Converter</PackageTags>
-		<AssemblyVersion>4.3.3</AssemblyVersion>
-		<FileVersion>4.3.3</FileVersion>
-		<Version>4.3.3</Version>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<IncludeSymbols>true</IncludeSymbols>
 		<PublishRepositoryUrl>true</PublishRepositoryUrl>
 		<EmbedUntrackedSources>true</EmbedUntrackedSources>
 		<SymbolPackageFormat>snupkg</SymbolPackageFormat>
 		<AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
-		<PackAsTool>true</PackAsTool>
 		<ToolCommandName>bibmark</ToolCommandName>
 		<PackageOutputPath>../nupkg</PackageOutputPath>
         <IncludeContentInPack>false</IncludeContentInPack>
@@ -41,13 +42,20 @@
 
 	<ItemGroup>
 		<PackageReference Include="CliWrap" Version="3.4.4" />
-		<PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="4.2.0" />
+		<PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="5.9.0" />
 		<PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
 	</ItemGroup>
 
-	<ItemGroup>
-		<None Include="..\README.md" CopyToOutputDirectory="PreserveNewest" />	
-	</ItemGroup>
+    <ItemGroup>
+        <None Condition="$(PackAsTool) != 'true'" Include="..\README.md">
+            <Pack>True</Pack>
+            <PackagePath>/</PackagePath>
+        </None>
+        <None Condition="$(PackAsTool) == 'true'" Include="..\README.md">
+            <Pack>True</Pack>
+            <PackagePath>/tools/net10.0/any/</PackagePath>
+        </None>
+    </ItemGroup>
 
 	<ItemGroup>
 	  <Folder Include="nupkg\" />

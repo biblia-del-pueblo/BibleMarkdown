@@ -10,6 +10,8 @@
 **/out/html/
 **/out/epub/
 NugetApiKey.txt
+nuget-apikey.txt
+
 
 # User-specific files
 *.rsuser
