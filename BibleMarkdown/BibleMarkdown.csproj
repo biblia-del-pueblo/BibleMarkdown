@@ -1,50 +1,58 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-	<PropertyGroup>
+    <PropertyGroup>
         <PackAsTool Condition="$(PackAsTool) == ''">false</PackAsTool>
 
-        <OutputType Condition="$(PackAsTool) == 'true'">Exe</OutputType>
-        <OutputType Condition="$(PackAsTool) != 'true'">Library</OutputType>
         <TargetFramework>net10.0</TargetFramework>
-		<ImplicitUsings>enable</ImplicitUsings>
-		<Nullable>enable</Nullable>
-        <StartupObject Condition="$(PackAsTool) == 'true'">BibleMarkdown.Program</StartupObject>
-		<!--<GenerateAssemblyInfo>false</GenerateAssemblyInfo>-->
-		<Deterministic>true</Deterministic>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <!--<GenerateAssemblyInfo>false</GenerateAssemblyInfo>-->
+        <Deterministic>true</Deterministic>
         <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
-		<AssemblyName>bibmark</AssemblyName>
+        <AssemblyName>bibmark</AssemblyName>
 
-        <PackageId Condition="$(PackAsTool) == 'true'">BibleMarkdown</PackageId>
-        <PackageId Condition="$(PackAsTool) != 'true'">BibleMarkdown.Library</PackageId>
         <Title>BibleMarkdown</Title>
-		<Authors>simonegli8</Authors>
-		<Company>Biblia del Pueblo</Company>
-		<Product>BibleMarkdown</Product>
-		<Description>A Markdown converter tailored for creation of Bibles</Description>
-		<Copyright>Estrellas de Esperanza © 2026</Copyright>
-		<PackageProjectUrl>https://github.com/biblia-del-pueblo/BibleMarkdown</PackageProjectUrl>
-        <PackageReadmeFile Condition="$(PackAsTool) == 'true'">tools/net10.0/any/README.md</PackageReadmeFile>
+        <Authors>simonegli8</Authors>
+        <Company>Biblia del Pueblo</Company>
+        <Product>BibleMarkdown</Product>
+        <Description>A Markdown converter tailored for creation of Bibles</Description>
+        <Copyright>Estrellas de Esperanza © 2026</Copyright>
+        <PackageProjectUrl>https://github.com/biblia-del-pueblo/BibleMarkdown</PackageProjectUrl>
         <PackageReadmeFile Condition="$(PackAsTool) != 'true'">README.md</PackageReadmeFile>
         <RepositoryUrl>https://github.com/biblia-del-pueblo/BibleMarkdown</RepositoryUrl>
-		<RepositoryType>git</RepositoryType>
-		<PackageTags>OpenSource, Bible, Bibles, Public Domain, Biblia, Markdown, Bible Markdown, Bible Converter</PackageTags>
-		<PackageLicenseExpression>MIT</PackageLicenseExpression>
-		<IncludeSymbols>true</IncludeSymbols>
-		<PublishRepositoryUrl>true</PublishRepositoryUrl>
-		<EmbedUntrackedSources>true</EmbedUntrackedSources>
-		<SymbolPackageFormat>snupkg</SymbolPackageFormat>
-		<AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
-		<ToolCommandName>bibmark</ToolCommandName>
-		<PackageOutputPath>../nupkg</PackageOutputPath>
-        <IncludeContentInPack>false</IncludeContentInPack>
+        <RepositoryType>git</RepositoryType>
+        <PackageTags>OpenSource, Bible, Bibles, Public Domain, Biblia, Markdown, Bible Markdown, Bible Converter</PackageTags>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <IncludeSymbols>true</IncludeSymbols>
+        <PublishRepositoryUrl>true</PublishRepositoryUrl>
+        <EmbedUntrackedSources>true</EmbedUntrackedSources>
+        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+        <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
+        <ToolCommandName>bibmark</ToolCommandName>
+        <PackageOutputPath>../nupkg</PackageOutputPath>
+        <!--<IncludeContentInPack>false</IncludeContentInPack>-->
         <IncludeBuildOutput>true</IncludeBuildOutput>
-	</PropertyGroup>
+    </PropertyGroup>
 
-	<ItemGroup>
-		<PackageReference Include="CliWrap" Version="3.4.4" />
-		<PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="5.9.0" />
-		<PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
-	</ItemGroup>
+    <PropertyGroup Condition="$(PackAsTool) == 'true'">
+        <PackageReadmeFile>tools/net10.0/any/README.md</PackageReadmeFile>
+        <PackageId>BibleMarkdown</PackageId>
+        <StartupObject Condition="$(PackAsTool) == 'true'">BibleMarkdown.Program</StartupObject>
+        <OutputType>Exe</OutputType>
+        <DefineConstants>$(DefineConstants);Tool</DefineConstants>
+    </PropertyGroup>
+    <PropertyGroup Condition="$(PackAsTool) != 'true'">
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <PackageId>BibleMarkdown.Library</PackageId>
+        <OutputType>Library</OutputType>
+    </PropertyGroup>
+
+
+    <ItemGroup>
+        <PackageReference Include="CliWrap" Version="3.4.4" />
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="5.9.0" />
+        <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+    </ItemGroup>
 
     <ItemGroup>
         <None Condition="$(PackAsTool) != 'true'" Include="..\README.md">
@@ -57,28 +65,28 @@
         </None>
     </ItemGroup>
 
-	<ItemGroup>
-	  <Folder Include="nupkg\" />
-	</ItemGroup>
+    <ItemGroup>
+        <Folder Include="nupkg\" />
+    </ItemGroup>
 
-	<ItemGroup>
-	  <None Update="runtimes\linux-arm64\pandoc">
-	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-	  </None>
-	  <None Update="runtimes\linux-x64\pandoc">
-	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-	  </None>
-	  <None Update="runtimes\osx-arm64\pandoc">
-	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-	  </None>
-	  <None Update="runtimes\osx-x64\pandoc">
-	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-	  </None>
-	  <None Update="runtimes\win\pandoc.exe">
-	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-	  </None>
-	</ItemGroup>
- 
+    <ItemGroup>
+        <None Update="runtimes\linux-arm64\pandoc">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+        <None Update="runtimes\linux-x64\pandoc">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+        <None Update="runtimes\osx-arm64\pandoc">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+        <None Update="runtimes\osx-x64\pandoc">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+        <None Update="runtimes\win\pandoc.exe">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+    </ItemGroup>
+
     <!--<Target Name="IncludeReadmeInPackage" AfterTargets="Build">
         <Copy
           SourceFiles="..\README.md"
