@@ -36,7 +36,8 @@
 		<AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
 		<ToolCommandName>bibmark</ToolCommandName>
 		<PackageOutputPath>../nupkg</PackageOutputPath>
-        <IncludeContentInPack>false</IncludeContentInPack>
+        <!-- Do not set IncludeContentInPack to false: NuGet then skips collecting every item marked Pack="true",
+             including the README.md below, and pack fails with NU5039 "The readme file does not exist in the package". -->
         <IncludeBuildOutput>true</IncludeBuildOutput>
 	</PropertyGroup>
 
