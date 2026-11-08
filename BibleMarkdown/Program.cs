@@ -1,4 +1,5 @@
 ﻿using Microsoft.CodeAnalysis.CSharp.Scripting;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Scripting;
 using System;
 using System.Collections.Generic;
@@ -22,20 +23,44 @@ namespace BibleMarkdown;
 
 [Flags]
 public enum Outputs { Pandoc = 1, Html = 2, TeX = 4, Epub = 8, USFM = 0x10, OSIS = 0x20, Sword = 0x40, All = 0xFFFF, None = 0 };
-partial class Program
+public partial class Program
 {
-    public static DateTime bibmarktime;
-    public static bool LowercaseFirstWords = false;
-    public static bool ImportStrongs = false;
-    public static bool EachVerseOnNewLine = true;
+    public static Importer Import = new Importer();
+    public static Creator Create = new Creator();
+    static DateTime? bibmarktime = null;
+    public static DateTime BibmarkTime {
+        get {
+            if (bibmarktime == null) {
+                var exe = Assembly.GetExecutingAssembly().Location;
+                bibmarktime = File.GetLastWriteTimeUtc(exe);
+            }
+            return bibmarktime.Value;
+        }
+    }
+    public static bool LowercaseFirstWords
+    {
+        get => Import.LowercaseFirstWords;
+        set => Import.LowercaseFirstWords = value;
+    }
+    public static bool ImportStrongs {
+        get => Import.ImportStrongs;
+        set => Import.ImportStrongs = value;
+    }
+    public static bool EachVerseOnNewLine
+    {
+        get => Import.EachVerseOnNewLine;
+        set => Import.EachVerseOnNewLine = value;
+    }
     public static bool FromSource = true;
-    public static bool Imported = false;
-    public static string SwordVersification = "KJV";
+    public static bool Imported => Import.Imported;
+    public static string SwordVersification {
+        get => Create.SwordVersification;
+        set => Create.SwordVersification = value;
+    }
     public static bool Help = false;
     public static bool ParagraphVerses = true;
     public static Func<string, string> Preprocess = s => s;
     public static Func<string, string> PreprocessImportUSFM = s => s;
-    public static Outputs Output { get; set; } = Outputs.All;
     static string language;
     public static string Language
     {
@@ -50,48 +75,26 @@ partial class Program
         }
     }
 
-    public static string LanguageCode
+
+    public static string? RightLanguage
     {
-        get
-        {
-            var language = Regex.Replace(Language, "[0-9]", "");
-            var culture = CultureInfo
-                .GetCultures(CultureTypes.NeutralCultures)
-                .FirstOrDefault(c => c.EnglishName.StartsWith(language, StringComparison.OrdinalIgnoreCase) ||
-                    c.NativeName.StartsWith(language, StringComparison.OrdinalIgnoreCase));
-            return culture?.Name ?? "en";
-        }
+        get => Create.RightLanguage;
+        set => Create.RightLanguage = value;
+    }
+    public static string? LeftLanguage
+    {
+        get => Create.LeftLanguage;
+        set => Create.LeftLanguage = value;
     }
 
-    public static string RightLanguage
-    {
-        get { return rightlanguage; }
-        set
-        {
-            if (value != rightlanguage)
-            {
-                rightlanguage = value;
-                Log($"RightLanguage set to {rightlanguage}");
-            }
-        }
+    public static string? Replace {
+        get => Create.Replace;
+        set => Create.Replace = value;
     }
-    public static string LeftLanguage
-    {
-        get { return leftlanguage; }
-        set
-        {
-            if (value != leftlanguage)
-            {
-                leftlanguage = value;
-                Log($"LeftLanguage set to {leftlanguage}");
-            }
-        }
+    public static bool TwoLanguage {
+        get => Create.TwoLanguage;
+        set => Create.TwoLanguage = value;
     }
-
-    static string leftlanguage;
-    static string rightlanguage;
-    public static string? Replace = null;
-    public static bool TwoLanguage = false;
 
     public struct Footnote
     {
@@ -139,94 +142,22 @@ partial class Program
         if (File.Exists(srcfile)) srctime = File.GetLastWriteTimeUtc(srcfile);
         var filetime = DateTime.MinValue;
         if (File.Exists(file)) filetime = File.GetLastWriteTimeUtc(file);
-        return filetime > srctime && filetime > bibmarktime;
+        return filetime > srctime && filetime > BibmarkTime;
     }
-
-    static string Label(int i)
-    {
-        if (i == 0) return "a";
-        StringBuilder label = new StringBuilder();
-        while (i > 0)
-        {
-            var ch = (char)(((int)'a') + i % 26);
-            label.Append(ch);
-            i = i / 26;
-        }
-        return label.ToString();
-    }
-
-    public static Outline? OutlineForCreate { get; set; }
-
-    public static void ReadOutlineForCreate(string path)
-    {
-        OutlineForCreate = ReadOutlines(path);
-    }
-
-    static Task ProcessFileAsync(string file)
-    {
-        var path = Path.GetDirectoryName(file);
-        var md = Path.Combine(path, "out", "pandoc");
-        var mdtex = Path.Combine(md, "tex");
-        var mdepub = Path.Combine(md, "epub");
-        var mdusfm = Path.Combine(md, "usfm");
-        var tex = Path.Combine(path, "out", "tex");
-        var html = Path.Combine(path, "out", "html");
-        var usfm = Path.Combine(path, "out", "usfm");
-        if (!Directory.Exists(md)) Directory.CreateDirectory(md);
-        if (!Directory.Exists(mdtex)) Directory.CreateDirectory(mdtex);
-        if (!Directory.Exists(mdepub)) Directory.CreateDirectory(mdepub);
-        if (!Directory.Exists(mdusfm)) Directory.CreateDirectory(mdusfm);
-        if (!Directory.Exists(tex)) Directory.CreateDirectory(tex);
-        if (!Directory.Exists(html)) Directory.CreateDirectory(html);
-        if (!Directory.Exists(usfm)) Directory.CreateDirectory(usfm);
-        var mdfile = Path.Combine(md, Path.GetFileName(file));
-        var texfile = Path.Combine(tex, Path.GetFileNameWithoutExtension(file) + ".tex");
-        var htmlfile = Path.Combine(html, Path.GetFileNameWithoutExtension(file) + ".html");
-        var epubfile = Path.Combine(mdepub, Path.GetFileNameWithoutExtension(file) + ".md");
-        var usfmfile = Path.Combine(usfm, Path.GetFileNameWithoutExtension(file) + ".usfm");
-        Task TeXTask = Task.CompletedTask, HtmlTask = Task.CompletedTask;
-
-        CreatePandoc(file, mdfile);
-        CreateEpub(path, mdfile, epubfile);
-        CreateUSFM(mdfile, usfmfile);
-        return Task.WhenAll(CreateTeXAsync(mdfile, texfile), CreateHtmlAsync(mdfile, htmlfile));
-    }
-
 
     static async Task ProcessPath(string path)
     {
         RunScript(path);
         var srcpath = Path.Combine(path, "src");
         var outpath = Path.Combine(path, "out");
-        if (!Directory.Exists(outpath)) Directory.CreateDirectory(outpath);
-        if (Directory.Exists(srcpath))
+        Directory.CreateDirectory(outpath);
+        if (Directory.Exists(srcpath) && FromSource)
         {
-            BookList.Books.Load(path);
-            ImportFromZip(path, srcpath);
-            ImportFromBibleEdit(srcpath);
-            ImportFromUSFM(path, srcpath);
-            ImportFromTXT(path, srcpath);
-            ImportFromZefania(path, srcpath);
-            ImportFromXmlOther(path, srcpath);
-            ImportFromSWORD(path, srcpath);
-            ImportJavascripture(path, srcpath);
-            ImportFromBibleMarkdown(path, srcpath);
-            ImportParallelVerses(path);
-            ImportOutline(path);
+            Import.All(path, srcpath);
         }
-        ReadOutlineForCreate(path);
-        var files = Directory.EnumerateFiles(path, "*.md")
-            .Where(file => Regex.IsMatch(Path.GetFileName(file), @"^[0-9.]+-.*?(?!outline.md$|map.md$)"));
-        if (files.Any())
-        {
-            CreateOutline(path);
-            CreateVerseStats(path);
-            var osisFile = Path.Combine(path, "out", "osis", $"{Path.GetFileName(path)}.xml");
-            CreateOSIS(files, osisFile);
-            await CreateSWORD(osisFile, Path.Combine(path, "out", "sword", "modules", "texts", "ztext", Path.GetFileName(path)), Program.SwordVersification);
-            Log("Convert to Pandoc...");
-            await Task.WhenAll(files.AsParallel().Select(file => ProcessFileAsync(file)));
-        }
+
+        await Create.ToAllAsync(path);
+
         File.WriteAllText(Path.Combine(outpath, "bibmark.log"), log.ToString());
         log.Clear();
     }
@@ -263,9 +194,9 @@ partial class Program
         // ProcessPath(path2);
         RunScript(path);
         Books.Load(path);
-        CreateTwoLanguage(path, path1, path2);
+        Create.ToTwoLanguage(path, path1, path2);
         var files = Directory.EnumerateFiles(path, "*.md");
-        Task.WaitAll(files.AsParallel().Select(file => ProcessFileAsync(file)).ToArray());
+        Task.WaitAll(files.AsParallel().Select(file => Create.ProcessFileAsync(file)).ToArray());
         File.WriteAllText(Path.Combine(outpath, "bibmark.log"), log.ToString());
         log.Clear();
     }
@@ -469,8 +400,6 @@ Options:
         InitPandoc();
         //var process = Process.GetCurrentProcess();
         //var exe = process.MainModule.FileName;
-        var exe = Assembly.GetExecutingAssembly().Location;
-        bibmarktime = File.GetLastWriteTimeUtc(exe);
 
         LowercaseFirstWords = args.Contains("-plc");
         EachVerseOnNewLine = !args.Contains("-cp");
@@ -522,7 +451,7 @@ Options:
             {
                 await ProcessPath(path);
             }
-            else if (File.Exists(path)) ProcessFileAsync(path).Wait();
+            else if (File.Exists(path)) Create.ProcessFileAsync(path).Wait();
         }
 
     }

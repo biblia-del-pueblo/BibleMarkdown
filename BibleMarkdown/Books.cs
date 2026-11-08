@@ -51,13 +51,13 @@ public class BookList : SortedList<string, SortedList<string, Book>>
 		return -1;
 	}
 
-	public void Load(string path)
+	public BookList Load(string path)
 	{
-		if (Count > 1) return;
+		if (Count > 1) return this;
 
 		var namesfile = Path.Combine(path, "src", "booknames.xml");
 
-		if (!File.Exists(namesfile)) return;
+		if (!File.Exists(namesfile)) return this;
 
 		XElement xml;
 		using (var file = File.Open(namesfile, FileMode.Open, FileAccess.Read))
@@ -93,21 +93,24 @@ public class BookList : SortedList<string, SortedList<string, Book>>
 				books.Add(book.Name, book);
 			}
 		}
+
+		return this;
 	}
 
-	public void Load(IEnumerable<string> mdfiles)
+	public BookList Load(IEnumerable<string> mdfiles)
 	{
 		if (!ContainsKey("default")) Add("default", new SortedList<string, Book>());
 		
 		var books = this["default"];
 
-		if (books.Count > 0) return;
+		if (books.Count > 0) return this;
 
 		foreach (var file in mdfiles)
 		{
 			var book = new Book() { Language = null, Abbreviation = "", Name = Name(file), Number = Number(file) };
 			books.Add(book.Name, book);
 		}
+		return this;
 	}
 
 	public IEnumerable<Book> All => Values.SelectMany(lang => lang.Values);
@@ -361,7 +364,7 @@ public class Location: IComparable<Location>
 	int IComparable<Location>.CompareTo(Location? other) => Compare(this, other);
 }
 
-partial class Program
+public partial class Program
 {
 	public static BookList Books => BookList.Books;
 

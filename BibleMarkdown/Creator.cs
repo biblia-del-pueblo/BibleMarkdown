@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Formats.Tar;
+using System.Globalization;
 using System.Linq;
 using System.Runtime.ConstrainedExecution;
 using System.Runtime.Intrinsics.Arm;
@@ -11,21 +12,96 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Xml.Linq;
+using static BibleMarkdown.SwordVersification;
 using static System.Net.Mime.MediaTypeNames;
 
 namespace BibleMarkdown;
 
-partial class Program
+public class Creator
 {
+    public Outputs Output { get; set; } = Outputs.All;
+    public virtual Outline Outline { get; set; } = new Outline();
+    public virtual Action<string> Log { get; set; } = Program.Log;
+    public virtual BookList Books { get; set; } = new BookList();
+    public virtual string? Language { get; set; }
+    public string LanguageCode
+    {
+        get
+        {
+            var language = Regex.Replace(Language, "[0-9]", "");
+            var culture = CultureInfo
+                .GetCultures(CultureTypes.NeutralCultures)
+                .FirstOrDefault(c => c.EnglishName.StartsWith(language, StringComparison.OrdinalIgnoreCase) ||
+                    c.NativeName.StartsWith(language, StringComparison.OrdinalIgnoreCase));
+            return culture?.Name ?? "en";
+        }
+    }
 
-    public static string CleanStrongs(string text)
+
+    public string SwordVersification { get; set; } = "KJV";
+    public virtual bool TwoLanguage { get; set; } = false;
+
+    public Epub Epub
+    {
+        get => field ??= new Epub(this);
+    }
+    public string? RightLanguage
+    {
+        get => field;
+        set
+        {
+            if (value != field)
+            {
+                field = value;
+                Log($"RightLanguage set to {value}");
+            }
+        }
+    }
+    public string? LeftLanguage
+    {
+        get => field;
+        set
+        {
+            if (value != field)
+            {
+                field = value;
+                Log($"LeftLanguage set to {value}");
+            }
+        }
+    }
+
+    public Func<string, string> Preprocess = s => s;
+    public string? Replace = null;
+    public virtual string FootnoteLabel(int n) => Importer.FootnoteLabel(n);
+    public DateTime BibmarkTime => Program.BibmarkTime;
+    public void LogFile(string file)
+    {
+        LogFile(file, "Created");
+    }
+    public void LogFile(string file, string label)
+    {
+        var current = Directory.GetCurrentDirectory();
+        if (file.StartsWith(current))
+        {
+            file = file.Substring(current.Length);
+        }
+        Log($"{label} {file}");
+    }
+    public void ReadOutline(string path)
+    {
+        Outline = Importer.ReadOutlines(path);
+    }
+
+    public static bool IsNewer(string file, string srcfile) => Program.IsNewer(file, srcfile);
+
+    public string CleanStrongs(string text)
     {
         text = Regex.Replace(text, @"(?<=[\p{L}\p{M}]+)_(?=(?![GH][0-9]+|&[\p{L}\p{M}]+|%[0-9a-zA-Z-]+)[\p{L}\p{M}]+)", " ");
         text = Regex.Replace(text, @"(?<=[&%-0-9\p{L}\p{M}]+)_([GH][0-9]+|&[\p{L}\p{M}]+|%[0-9a-zA-Z-]+)", "");
         return text;
     }
 
-    public static string UsfmStrongs(string text)
+    public string UsfmStrongs(string text)
     {
         return Regex.Replace(text, @"[\p{L}\p{M}]+(_[%&\p{Nd}\p{L}\p{M}-]+)+", match =>
         {
@@ -56,14 +132,17 @@ partial class Program
         });
     }
 
-    public static void CreatePandoc(string file, string panfile)
+
+    public string ApplyOutline(string src, string file, Outline? items) => Importer.ApplyOutline(src, file, items, Books, Log, FootnoteLabel);
+
+    public void ToPandoc(string file, string panfile)
     {
         if ((Output & (Outputs.Pandoc | Outputs.USFM | Outputs.TeX | Outputs.Epub | Outputs.Html)) == Outputs.None ||
             IsNewer(panfile, file)) return;
 
         var text = File.ReadAllText(file);
 
-        text = ApplyOutline(text, file, OutlineForCreate);
+        text = ApplyOutline(text, file, Outline);
 
         string? bookname = Books.Name(file);
         int bookno = Books.Number(file);
@@ -97,14 +176,14 @@ partial class Program
         do
         {
             replaced = false;
-            text = Regex.Replace(text, @"\^(?<mark>[a-zA-Z]+)\^(?!\[)(?<text>.*?)(?:\^\k<mark>(?<footnote>\^\[(?>\[(?<c>)|[^\[\]]+|\](?<-c>))*(?(c)(?!))\]))[ \t]*\r?\n?", m =>
+            text = Regex.Replace(text, @"\^(?<mark>[a-zA-Z]+)\^(?!\[)(?<text>.*?)(?:(?<own>^)?\^\k<mark>(?<footnote>\^\[(?>\[(?<c>)|[^\[\]]+|\](?<-c>))*(?(c)(?!))\]))[ \t]*(?(own)\r?\n?)", m =>
             {
                 replaced = true;
                 return $"{m.Groups["footnote"].Value}{m.Groups["text"].Value}";
             }, RegexOptions.Singleline);// ^^ footnotes
         } while (replaced);
 
-        if (Regex.IsMatch(text, @"(//|/\*)!verse-paragraphs(\s|\r?\n|\*/)", RegexOptions.Singleline)) // each verse in a separate paragraph. For use in Psalms & Proverbs
+        if (Regex.IsMatch(text, @"(//|/\*)!verse-paragraphs(\s|\r?\n|\*/)", RegexOptions.Singleline | RegexOptions.Multiline)) // each verse in a separate paragraph. For use in Psalms & Proverbs
         {
             text = Regex.Replace(text, @"(\^[0-9]+\^[^#]*?)(\s*?)(?=\^[0-9]+\^)", "$1\\\n", RegexOptions.Singleline);
             text = Regex.Replace(text, @"(@[0-9]+[^#]*?)(\s*?)(?=@[0-9]+)", "$1\\\n", RegexOptions.Singleline);
@@ -146,14 +225,14 @@ partial class Program
         LogFile(panfile);
     }
 
-    public static void CreateOSIS(IEnumerable<string> mdfiles, string osisFile)
+    public void ToOSIS(IEnumerable<string> mdfiles, string osisFile)
     {
         if (!Output.HasFlag(Outputs.OSIS)) return;
         var mdmodified = mdfiles.Select(file => File.GetLastWriteTimeUtc(file)).Max();
         if (mdmodified <= File.GetLastWriteTimeUtc(osisFile)) return;
 
         XNamespace ns = "http://www.bibletechnologies.net/2003/OSIS/namespace";
-        var xtext = new XElement(ns + "osisText", new XAttribute("osisIDWork", "Bible"), new XAttribute(XNamespace.Xml + "lang", Program.LanguageCode));
+        var xtext = new XElement(ns + "osisText", new XAttribute("osisIDWork", "Bible"), new XAttribute(XNamespace.Xml + "lang", LanguageCode));
         var xml = new XElement(ns + "osis",
             new XAttribute(XNamespace.Xmlns + "xsi", "http://www.w3.org/2001/XMLSchema-instance"),
             new XAttribute(XNamespace.Get("http://www.w3.org/2001/XMLSchema-instance") + "schemaLocation",
@@ -303,8 +382,9 @@ partial class Program
         LogFile(osisFile);
     }
 
-    public static async Task CreateSWORD(string osisFile, string swordPath, string versification = "KJV")
+    public async Task ToSWORDAsync(string osisFile, string swordPath, string? versification = null)
     {
+        if (versification == null) versification = SwordVersification;
         if (!Output.HasFlag(Outputs.Sword)) return;
 
         var osis2mod = Pandoc.Find("osis2mod");
@@ -336,7 +416,7 @@ partial class Program
         }
     }
 
-    static async Task CreateTeXAsync(string mdfile, string texfile)
+    public async Task ToTeXAsync(string mdfile, string texfile)
     {
         if (!Output.HasFlag(Outputs.TeX) || IsNewer(texfile, mdfile)) return;
 
@@ -370,7 +450,7 @@ partial class Program
         }
     }
 
-    static async Task CreateHtmlAsync(string mdfile, string htmlfile)
+    public async Task ToHtmlAsync(string mdfile, string htmlfile)
     {
         if (!Output.HasFlag(Outputs.Html) || IsNewer(htmlfile, mdfile) || TwoLanguage) return;
 
@@ -390,12 +470,12 @@ partial class Program
     }
 
 
-    static string Id(string name)
+    public string Id(string name)
     {
         return name.Replace(' ', '-').Replace('.', '-');
     }
 
-    static void CreateTwoLanguage(string path, string path1, string path2)
+    public void ToTwoLanguage(string path, string path1, string path2)
     {
 
         Log("Create Two Langauge...");
@@ -468,7 +548,7 @@ partial class Program
             LogFile(newfile);
         }
     }
-    static void CreateVerseStats(string path)
+    public void ToVerseStats(string path)
     {
         var sources = Directory.EnumerateFiles(path, "*.md")
             .Where(file => Regex.IsMatch(Path.GetFileName(file), "^([0-9][0-9])"));
@@ -478,7 +558,7 @@ partial class Program
         var frametime = DateTime.MinValue;
         if (File.Exists(frames)) frametime = File.GetLastWriteTimeUtc(frames);
 
-        if (sources.All(src => File.GetLastWriteTimeUtc(src) < frametime) && frametime > bibmarktime) return;
+        if (sources.All(src => File.GetLastWriteTimeUtc(src) < frametime) && frametime > BibmarkTime) return;
 
         bool firstsrc = true;
         int btotal = 0;
@@ -540,7 +620,7 @@ partial class Program
         LogFile(frames);
     }
 
-    static void CreateOutline(string path)
+    public void ToOutline(string path)
     {
         var sources = Directory.EnumerateFiles(path, "*.md")
             .Where(file => Regex.IsMatch(Path.GetFileName(file), @"^([0-9][0-9])(?!.*?\.outline\.md)"));
@@ -550,7 +630,7 @@ partial class Program
         var frametime = DateTime.MinValue;
         if (File.Exists(framesfile)) frametime = File.GetLastWriteTimeUtc(framesfile);
 
-        if (!sources.Any() || sources.All(src => File.GetLastWriteTimeUtc(src) < frametime) && frametime > bibmarktime) return;
+        if (!sources.Any() || sources.All(src => File.GetLastWriteTimeUtc(src) < frametime) && frametime > BibmarkTime) return;
 
         var items = new Outline();
 
@@ -622,7 +702,7 @@ partial class Program
             }
         }
 
-        var append = ReadOutlines(path);
+        var append = Importer.ReadOutlines(path);
         if (!append.Append && append.Count > 0)
         {
             items = append;
@@ -635,7 +715,7 @@ partial class Program
         items.Save(framesfile);
     }
 
-    static void CreateUSFM(string mdfile, string usfmfile)
+    public void ToUSFM(string mdfile, string usfmfile)
     {
         if (!Output.HasFlag(Outputs.USFM)) return;
 
@@ -688,16 +768,53 @@ partial class Program
         File.WriteAllText(usfmfile, txt);
         LogFile(usfmfile);
     }
-    static string Marker(int n)
+
+    public Task ProcessFileAsync(string file)
     {
-        StringBuilder s = new StringBuilder();
-        while (n > 0)
-        {
-            s.Append((char)((int)'a' + n % 26 - 1));
-            n = n / 26;
-        }
-        return s.ToString();
+        var path = Path.GetDirectoryName(file);
+        var md = Path.Combine(path, "out", "pandoc");
+        var mdtex = Path.Combine(md, "tex");
+        var mdepub = Path.Combine(md, "epub");
+        var mdusfm = Path.Combine(md, "usfm");
+        var tex = Path.Combine(path, "out", "tex");
+        var html = Path.Combine(path, "out", "html");
+        var usfm = Path.Combine(path, "out", "usfm");
+        if (!Directory.Exists(md)) Directory.CreateDirectory(md);
+        if (!Directory.Exists(mdtex)) Directory.CreateDirectory(mdtex);
+        if (!Directory.Exists(mdepub)) Directory.CreateDirectory(mdepub);
+        if (!Directory.Exists(mdusfm)) Directory.CreateDirectory(mdusfm);
+        if (!Directory.Exists(tex)) Directory.CreateDirectory(tex);
+        if (!Directory.Exists(html)) Directory.CreateDirectory(html);
+        if (!Directory.Exists(usfm)) Directory.CreateDirectory(usfm);
+        var mdfile = Path.Combine(md, Path.GetFileName(file));
+        var texfile = Path.Combine(tex, Path.GetFileNameWithoutExtension(file) + ".tex");
+        var htmlfile = Path.Combine(html, Path.GetFileNameWithoutExtension(file) + ".html");
+        var epubfile = Path.Combine(mdepub, Path.GetFileNameWithoutExtension(file) + ".md");
+        var usfmfile = Path.Combine(usfm, Path.GetFileNameWithoutExtension(file) + ".usfm");
+        Task TeXTask = Task.CompletedTask, HtmlTask = Task.CompletedTask;
+
+        ToPandoc(file, mdfile);
+        var tasks = new[] { ToTeXAsync(mdfile, texfile), ToHtmlAsync(mdfile, htmlfile) };
+        Epub.ToEpub(path, mdfile, epubfile);
+        ToUSFM(mdfile, usfmfile);
+        return Task.WhenAll(tasks);
     }
 
+    public async Task ToAllAsync(string path)
+    {
+        ReadOutline(path);
+        var files = Directory.EnumerateFiles(path, "*.md")
+            .Where(file => Regex.IsMatch(Path.GetFileName(file), @"^[0-9.]+-.*?(?!outline.md$|map.md$)"));
+        if (files.Any())
+        {
+            ToOutline(path);
+            ToVerseStats(path);
+            var osisFile = Path.Combine(path, "out", "osis", $"{Path.GetFileName(path)}.xml");
+            ToOSIS(files, osisFile);
+            await ToSWORDAsync(osisFile, Path.Combine(path, "out", "sword", "modules", "texts", "ztext", Path.GetFileName(path)));
+            Log("Convert to Pandoc...");
+            await Task.WhenAll(files.AsParallel().Select(file => ProcessFileAsync(file)));
+        }
 
+    }
 }

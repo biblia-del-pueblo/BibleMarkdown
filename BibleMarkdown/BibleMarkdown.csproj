@@ -6,6 +6,7 @@
         <TargetFramework>net10.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <LangVerison>14</LangVerison>
         <!--<GenerateAssemblyInfo>false</GenerateAssemblyInfo>-->
         <Deterministic>true</Deterministic>
         <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
