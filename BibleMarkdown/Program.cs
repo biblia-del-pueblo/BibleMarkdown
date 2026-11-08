@@ -28,7 +28,7 @@ partial class Program
     public static bool LowercaseFirstWords = false;
     public static bool ImportStrongs = false;
     public static bool EachVerseOnNewLine = true;
-    public static bool FromSource = false;
+    public static bool FromSource = true;
     public static bool Imported = false;
     public static string SwordVersification = "KJV";
     public static bool Help = false;

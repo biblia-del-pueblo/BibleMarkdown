@@ -17,7 +17,7 @@ namespace BibleMarkdown;
 partial class Program
 {
 
-	static void ImportFromBibleMarkdown(string mdpath, string srcpath)
+	public static void ImportFromBibleMarkdown(string mdpath, string srcpath)
 	{
 		srcpath = Path.Combine(srcpath, "bibmark");
 		if (!Directory.Exists(srcpath)) return;
@@ -63,7 +63,7 @@ partial class Program
 		}
     }
 
-    static void ImportFromUSFM(string mdpath, string srcpath)
+    public static void ImportFromUSFM(string mdpath, string srcpath)
 	{
 		var sources = Directory.EnumerateFiles(srcpath)
 			.Where(file => file.EndsWith(".usfm"));
@@ -998,7 +998,7 @@ partial class Program
 		return src;
 	}
 
-	static void ImportOutline(string path)
+	public static void ImportOutline(string path)
 	{
 
 		if (FromSource || Imported)
