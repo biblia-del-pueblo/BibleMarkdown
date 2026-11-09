@@ -69,6 +69,8 @@ public class Importer
         FromZefania(mdpath, srcpath);
         FromXmlOther(mdpath, srcpath);
         FromSWORD(mdpath, srcpath);
+        FromESword(mdpath, srcpath);
+        FromMySword(mdpath, srcpath);
         FromJavascripture(mdpath, srcpath);
         FromBibleMarkdown(mdpath, srcpath);
         ParallelVerses(mdpath);
@@ -791,6 +793,171 @@ public class Importer
         catch (Exception ex) when (ex is NotSupportedException or InvalidDataException or IOException)
         {
             Log($"The SWORD module {Path.GetFileName(confs[0])} cannot be imported: {ex.Message}");
+        }
+    }
+
+    // ---- e-Sword and MySword ----------------------------------------------------------------------------
+
+    /// <summary>
+    /// Imports a Bible module of e-Sword (.bblx, .bbli) and a Strong's dictionary or lexicon of e-Sword (.dctx, .dcti, .lexi). Place the
+    /// module, or the zip that has it, in the src folder. The files are SQLite databases, which are read directly (no
+    /// SQLite library is needed). The books of the canon, 1 to 66, are imported, with their headings, footnotes, the words
+    /// of Jesus and, if <see cref="ImportStrongs"/> is set, the Strong's numbers.
+    /// </summary>
+    public void FromESword(string mdpath, string? srcpath = null) =>
+        FromSqliteModules("e-Sword", mdpath, srcpath, [".bblx", ".bbli"], [".dctx", ".dcti", ".lexi"]);
+
+    /// <summary>
+    /// Imports a Bible module of MySword (.bbl.mybible) and a Strong's dictionary of MySword (.dct.mybible), like
+    /// <see cref="FromESword"/> does for e-Sword: the two programs have the same format of Bible modules.
+    /// </summary>
+    public void FromMySword(string mdpath, string? srcpath = null) =>
+        FromSqliteModules("MySword", mdpath, srcpath, [".bbl.mybible"], [".dct.mybible"]);
+
+    void FromSqliteModules(string program, string mdpath, string? srcpath, string[] bibleExtensions, string[] dictionaryExtensions)
+    {
+        if (srcpath == null) srcpath = Path.Combine(mdpath, "src");
+        if (!Directory.Exists(srcpath)) return;
+        var extensions = bibleExtensions.Concat(dictionaryExtensions).ToArray();
+        bool Is(string file, string[] of) => of.Any(e => file.EndsWith(e, StringComparison.OrdinalIgnoreCase));
+
+        List<string> Modules() => Directory.EnumerateFiles(srcpath, "*", SearchOption.AllDirectories).Where(f => Is(f, extensions)).Order().ToList();
+        var modules = Modules();
+        if (modules.Count == 0)
+        {
+            // a zip that has such modules is unpacked (a zip of a SWORD module is left to FromSWORD)
+            foreach (var zip in Directory.EnumerateFiles(srcpath, "*.zip"))
+            {
+                using (var archive = ZipFile.OpenRead(zip))
+                    if (!archive.Entries.Any(e => Is(e.FullName, extensions))) continue;
+                ZipFile.ExtractToDirectory(zip, srcpath, true);
+            }
+            modules = Modules();
+        }
+        if (modules.Count == 0) return;
+
+        foreach (var dictionary in modules.Where(f => Is(f, dictionaryExtensions)))
+            ImportSqliteDictionary(program, dictionary, mdpath);
+
+        var bibles = modules.Where(f => Is(f, bibleExtensions)).ToList();
+        if (bibles.Count > 1) Log($"There are several {program} Bibles in {srcpath}, only {Path.GetFileName(bibles[0])} is imported.");
+        if (bibles.Count > 0) ImportSqliteBible(program, bibles[0], mdpath);
+    }
+
+    void ImportSqliteBible(string program, string file, string mdpath)
+    {
+        try
+        {
+            var database = SqliteFile.Open(file);
+            Log($"Import from {program} module {Path.GetFileName(file)}{(ESwordModule.Description(database) is { } description ? $" ({description})" : "")}");
+
+            // book -> chapter -> verse -> text
+            var books = new SortedDictionary<int, SortedDictionary<int, SortedDictionary<int, string>>>();
+            int skipped = 0;
+            foreach (var (book, chapter, verse, text) in ESwordModule.Verses(database))
+            {
+                if (book < 1 || book > 66 || chapter < 1 || verse < 1) { if (book > 66) skipped++; continue; }
+                if (string.IsNullOrWhiteSpace(text)) continue;
+                if (!books.TryGetValue(book, out var chapters)) books[book] = chapters = new();
+                if (!chapters.TryGetValue(chapter, out var verses)) chapters[chapter] = verses = new();
+                verses[verse] = text;
+            }
+            if (skipped > 0) Log($"{skipped} verses of books after the 66 of the canon are not imported.");
+
+            var nl = Environment.NewLine;
+            foreach (var (number, chapters) in books)
+            {
+                var text = new StringBuilder();
+                foreach (var (chapter, rawVerses) in chapters)
+                {
+                    int notes = 0; // the footnotes are lettered a, b, c... in every chapter
+                    string NextLabel() => FootnoteLabel(notes++);
+
+                    var verses = new List<(int Number, SwordVerse Verse)>();
+                    bool paragraph = false;
+                    foreach (var (verseNumber, raw) in rawVerses)
+                    {
+                        var verse = ESwordMarkup.Convert(raw, ImportStrongs, NextLabel, out var paragraphAfter);
+                        if (verse.Text.Length == 0) { paragraph |= paragraphAfter; continue; } // empty verses are removed, as in the other imports
+                        verse.Paragraph = paragraph;
+                        paragraph = paragraphAfter;
+                        verses.Add((verseNumber, verse));
+                    }
+                    if (verses.Count == 0) continue;
+
+                    if (text.Length > 0) text.Append(nl).Append(nl);
+                    text.Append($"# {chapter}{nl}");
+                    bool first = true;
+                    foreach (var (verseNumber, verse) in verses)
+                    {
+                        if (verse.Titles.Count > 0)
+                        {
+                            if (!first) text.Append(nl).Append(nl);
+                            foreach (var title in verse.Titles) text.Append($"## {title}{nl}");
+                        }
+                        else if (!first)
+                        {
+                            if (verse.Paragraph) text.Append(nl).Append(nl); // a new paragraph is an empty line
+                            else if (EachVerseOnNewLine) text.Append(nl);
+                            else text.Append(' ');
+                        }
+                        text.Append($"@{verseNumber} ").Append(verse.Text);
+                        foreach (var (label, note) in verse.Notes) text.Append($" ^{label}^[{note}]"); // the footnotes follow their verse
+                        first = false;
+                    }
+                }
+                if (text.Length == 0) continue;
+
+                var book = SwordVersification.KJV.Books.First(b => b.Number == number);
+                var name = string.Concat(SwordBookName(book).Select(ch => Path.GetInvalidFileNameChars().Contains(ch) ? '_' : ch));
+                var md = Path.Combine(mdpath, $"{number:D2}-{name}.md");
+                File.WriteAllText(md, Regex.Replace(text.ToString(), @"\r?\n", nl));
+                Imported = true;
+                LogFile(md);
+            }
+        }
+        catch (Exception ex) when (ex is InvalidDataException or IOException or NotSupportedException)
+        {
+            Log($"The {program} module {Path.GetFileName(file)} cannot be imported: {ex.Message}");
+        }
+    }
+
+    /// <summary>Imports a Strong's dictionary of e-Sword or MySword to the database strongs.db, like the one of SWORD.</summary>
+    void ImportSqliteDictionary(string program, string file, string mdpath)
+    {
+        try
+        {
+            var database = SqliteFile.Open(file);
+            var description = ESwordModule.Description(database);
+            Log($"Import from {program} dictionary {Path.GetFileName(file)}{(description != null ? $" ({description})" : "")}");
+
+            // The keys are G26 or H7225, or plain numbers: then the module tells whether it is the Greek or the Hebrew one.
+            var marker = Path.GetFileName(file) + " " + description;
+            string? prefix = Regex.IsMatch(marker, @"greek|griego|grec|griech", RegexOptions.IgnoreCase) ? "G"
+                : Regex.IsMatch(marker, @"hebrew|hebreo|hébreu|hebr", RegexOptions.IgnoreCase) ? "H" : null;
+
+            var entries = new List<(string Key, string Markdown)>();
+            foreach (var (word, definition) in ESwordModule.Entries(database))
+            {
+                var key = StrongsDatabase.NormalizeKey(word, prefix);
+                if (key == null) continue;
+                var markdown = StrongsMarkup.ToMarkdown(definition);
+                if (markdown.Length > 0) entries.Add((key, markdown));
+            }
+            if (entries.Count == 0)
+            {
+                Log($"The {program} dictionary {Path.GetFileName(file)} has no Strong's entries (keys such as G26 or H7225; plain numbers only in a module that is marked as Greek or Hebrew).");
+                return;
+            }
+
+            var target = Path.Combine(mdpath, StrongsDatabase.FileName);
+            StrongsDatabase.Write(target, entries);
+            Imported = true;
+            LogFile(target);
+        }
+        catch (Exception ex) when (ex is InvalidDataException or IOException or LiteDB.LiteException)
+        {
+            Log($"The {program} dictionary {Path.GetFileName(file)} cannot be imported: {ex.Message}");
         }
     }
 

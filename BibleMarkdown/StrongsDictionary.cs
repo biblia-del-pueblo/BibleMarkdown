@@ -186,8 +186,11 @@ public static class StrongsMarkup
         }
         catch (XmlException)
         {
-            // Not well-formed (HTML-like markup): the text without the tags.
-            return Tidy(Regex.Replace(Regex.Replace(text, @"<(lb|br|p)\b[^>]*/?>", "\n\n"), "<[^>]+>", ""));
+            // Not well-formed (HTML-like markup, as in the lexicons of e-Sword): bold and italics are kept, the other tags go.
+            text = Regex.Replace(text, @"<(b|strong)\b[^>]*>(.*?)</\1>", m => Emphasis(m.Groups[2].Value, "**"), RegexOptions.Singleline | RegexOptions.IgnoreCase);
+            text = Regex.Replace(text, @"<(i|em)\b[^>]*>(.*?)</\1>", m => Emphasis(m.Groups[2].Value, "*"), RegexOptions.Singleline | RegexOptions.IgnoreCase);
+            text = Regex.Replace(text, @"<(lb|br|p)\b[^>]*/?>", "\n\n", RegexOptions.IgnoreCase);
+            return Tidy(System.Net.WebUtility.HtmlDecode(Regex.Replace(text, "<[^>]+>", "")));
         }
     }
 
@@ -279,6 +282,14 @@ public static class StrongsMarkup
     }
 
     /// <summary>Single spaces, no spaces around line breaks, one empty line between paragraphs, no outer white space.</summary>
+    /// <summary>Markdown emphasis; the spaces at the ends of the content stay outside the marks, and nothing is marked that is empty.</summary>
+    static string Emphasis(string content, string mark)
+    {
+        var trimmed = Regex.Replace(content, "<[^>]+>", "").Trim();
+        if (trimmed.Length == 0) return content;
+        return (content.Length > 0 && char.IsWhiteSpace(content[0]) ? " " : "") + mark + trimmed + mark + (content.Length > 0 && char.IsWhiteSpace(content[^1]) ? " " : "");
+    }
+
     static string Tidy(string text)
     {
         text = Regex.Replace(text, @"[ \t]+", " ");
