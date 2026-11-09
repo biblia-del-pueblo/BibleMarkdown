@@ -170,9 +170,12 @@ public static class WordIndex
         return sb.ToString().Normalize(NormalizationForm.FormC);
     }
 
-    /// <summary>The markdown of a verse without its footnotes and their markers (they are not part of the verse).</summary>
+    /// <summary>
+    /// The markdown of a verse without its footnotes and their markers (they are not part of the verse): <c>^[note]</c>,
+    /// <c>^a^[note]</c> (a marker followed by its note) and a lone marker <c>^a^</c> that starts the text of a note.
+    /// </summary>
     public static string WithoutFootnotes(string markdown) =>
-        Regex.Replace(markdown, @"\^\[" + Balanced + @"\]|\^[a-zA-Z]+\^", "");
+        Regex.Replace(markdown, @"\^(?:[a-zA-Z]+\^)?\[" + Balanced + @"\]|\^[a-zA-Z]+\^", "");
 
     /// <summary>The different words of a search phrase, in the order they first appear, as they are looked up.</summary>
     public static List<string> Terms(string phrase) =>
