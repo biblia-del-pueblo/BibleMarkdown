@@ -976,6 +976,7 @@ public class Importer
             }
 
             var target = Path.Combine(mdpath, StrongsDatabase.FileName);
+            if (File.Exists(target)) File.Delete(target);
             StrongsDatabase.Write(target, entries);
             Imported = true;
             LogFile(target);
@@ -1017,6 +1018,7 @@ public class Importer
             }
 
             var file = Path.Combine(mdpath, StrongsDatabase.FileName);
+            if (File.Exists(file)) File.Delete(file);
             StrongsDatabase.Write(file, entries);
             Imported = true;
             LogFile(file);
