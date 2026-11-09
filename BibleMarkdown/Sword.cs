@@ -12,7 +12,7 @@ namespace BibleMarkdown;
 /// .conf file only names the versification. KJV is built in; for another one the structure is derived from the
 /// module itself (<see cref="SwordModule"/>), which works for modules that mark their books and chapters.
 /// </summary>
-public sealed class SwordVersification
+public sealed partial class SwordVersification
 {
 	/// <param name="Number">1 to 66 for the books of the Protestant canon, else after them in the order of the module.</param>
 	/// <param name="NewTestament">Whether the book is in the index of the New Testament (else the one of the Old).</param>
@@ -83,10 +83,30 @@ public sealed class SwordVersification
 		chapter == 0 ? bookStart[book.Number] : chapterStart[book.Number][chapter - 1] + verse;
 
 	/// <summary>The versification with this name, or null if it is not supported. A module without one uses KJV.</summary>
-	public static SwordVersification? Find(string? name) =>
-		string.IsNullOrWhiteSpace(name) || name.Trim().Equals("KJV", StringComparison.OrdinalIgnoreCase) ? KJV : null;
+	public static SwordVersification? Find(string? name)
+	{
+		if (string.IsNullOrWhiteSpace(name) || name.Trim().Equals("KJV", StringComparison.OrdinalIgnoreCase)) return KJV;
+		return Systems.TryGetValue(name.Trim(), out var system) ? system.Value : null;
+	}
 
-	public static string Supported => "KJV";
+	public static string Supported => "KJV, " + string.Join(", ", Systems.Keys);
+
+	/// <summary>
+	/// A versification of the table of SWORD (see SwordVersifications.cs). The books of the canon are numbered 1 to 66
+	/// as in KJV, the others from 67 on in the order of the table; the names are the English ones.
+	/// </summary>
+	static SwordVersification Make(string name, (string OsisId, string Name, bool NewTestament, int[] Verses)[] books)
+	{
+		int extra = 66;
+		var result = new List<Book>();
+		foreach (var (osisId, bookName, newTestament, verses) in books)
+		{
+			var known = KnownBook(osisId);
+			int number = known is { Number: > 0 } ? known.Value.Number : ++extra;
+			result.Add(new Book(number, osisId, known?.Name ?? bookName, verses, newTestament));
+		}
+		return new SwordVersification(name, result);
+	}
 
 	/// <summary>The 66 books of the Protestant canon with 1189 chapters and 31102 verses.</summary>
 	public static readonly SwordVersification KJV = new("KJV", new Book[]
@@ -161,9 +181,87 @@ public sealed class SwordVersification
 }
 
 /// <summary>
+/// The cipher of The SWORD Project for modules that are encrypted (include/sapphire.h and swcipher.cpp): Sapphire, a
+/// stream cipher of Michael Paul Johnson, started from the CipherKey of the module. Every compressed block of a
+/// zText module and every entry of a RawText module is decrypted by itself, from the state that the key gives.
+/// </summary>
+internal sealed class SwordCipher
+{
+	readonly byte[] masterCards = new byte[256];
+	readonly byte masterRotor, masterRatchet, masterAvalanche, masterLastPlain, masterLastCipher;
+
+	public SwordCipher(byte[] key)
+	{
+		byte keySize = (byte)Math.Min(key.Length, 255);
+		var cards = masterCards;
+		for (int i = 0; i < 256; i++) cards[i] = (byte)i;
+
+		// Swap the card at each position with some other card, as the key tells.
+		byte rsum = 0;
+		int keyPos = 0;
+		for (int i = 255; i >= 0; i--)
+		{
+			int toSwap = KeyRand(i, key, keySize, ref rsum, ref keyPos, cards);
+			(cards[i], cards[toSwap]) = (cards[toSwap], cards[i]);
+		}
+
+		masterRotor = cards[1];
+		masterRatchet = cards[3];
+		masterAvalanche = cards[5];
+		masterLastPlain = cards[7];
+		masterLastCipher = cards[rsum];
+	}
+
+	static int KeyRand(int limit, byte[] key, byte keySize, ref byte rsum, ref int keyPos, byte[] cards)
+	{
+		if (limit == 0) return 0;
+		uint mask = 1;
+		while (mask < (uint)limit) mask = (mask << 1) + 1;
+		int retries = 0;
+		uint u;
+		do
+		{
+			rsum = (byte)(cards[rsum] + key[keyPos++]);
+			if (keyPos >= keySize)
+			{
+				keyPos = 0;                  // recycle the key
+				rsum = (byte)(rsum + keySize);
+			}
+			u = mask & rsum;
+			if (++retries > 11) u %= (uint)limit;
+		}
+		while (u > (uint)limit);
+		return (int)u;
+	}
+
+	/// <summary>Decrypts the bytes in place.</summary>
+	public void Decrypt(Span<byte> data)
+	{
+		var cards = (byte[])masterCards.Clone();
+		byte rotor = masterRotor, ratchet = masterRatchet, avalanche = masterAvalanche;
+		byte lastPlain = masterLastPlain, lastCipher = masterLastCipher;
+		for (int i = 0; i < data.Length; i++)
+		{
+			byte b = data[i];
+			ratchet = (byte)(ratchet + cards[rotor++]);
+			byte swap = cards[lastCipher];
+			cards[lastCipher] = cards[ratchet];
+			cards[ratchet] = cards[lastPlain];
+			cards[lastPlain] = cards[rotor];
+			cards[rotor] = swap;
+			avalanche = (byte)(avalanche + cards[swap]);
+			lastPlain = (byte)(b ^ cards[(cards[ratchet] + cards[rotor]) & 0xFF]
+				^ cards[cards[(cards[lastPlain] + cards[lastCipher] + cards[avalanche]) & 0xFF]]);
+			lastCipher = b;
+			data[i] = lastPlain;
+		}
+	}
+}
+
+/// <summary>
 /// A Bible module of The SWORD Project (a .conf file in mods.d and the files of its DataPath), read directly.
 /// Supported are the drivers zText, zText4, RawText and RawText4, compressed with ZIP (zlib) or LZSS, in UTF-8 or
-/// Latin-1, with the KJV versification.
+/// Latin-1, with any versification; modules that are encrypted with a key in their .conf file are decrypted.
 /// </summary>
 public sealed class SwordModule
 {
@@ -177,6 +275,7 @@ public sealed class SwordModule
 	readonly bool wide;        // zText4 and RawText4: sizes take 4 bytes instead of 2
 	readonly string compression;
 	readonly Encoding encoding;
+	readonly SwordCipher? cipher; // the module is encrypted with the CipherKey of its .conf file
 	readonly Testament?[] testaments = new Testament?[2];
 
 	sealed class Testament
@@ -205,8 +304,15 @@ public sealed class SwordModule
 			throw new NotSupportedException($"The driver '{Driver}' of the SWORD module {Name} is not supported (supported: zText, zText4, RawText, RawText4).");
 		wide = Driver.EndsWith("4");
 
-		if (conf.ContainsKey("CipherKey"))
-			throw new NotSupportedException($"The SWORD module {Name} is encrypted.");
+		// A module that is encrypted has its key in the .conf file when it may be used freely (CrossWire has the key of such
+		// a module as the CipherKey, often with the name of the module); a locked module has it empty, the key is then a
+		// secret that has to be bought.
+		if (conf.TryGetValue("CipherKey", out var key))
+		{
+			if (string.IsNullOrWhiteSpace(key))
+				throw new NotSupportedException($"The SWORD module {Name} is locked: its .conf file has no CipherKey.");
+			cipher = new SwordCipher(Encoding.Latin1.GetBytes(key.Trim()));
+		}
 
 		compression = conf.GetValueOrDefault("CompressType", "LZSS").Trim().ToUpperInvariant(); // LZSS is the default of SWORD
 		if (compressed && compression != "ZIP" && compression != "LZSS")
@@ -233,23 +339,33 @@ public sealed class SwordModule
 	int Entries(int testament) => testaments[testament] == null ? 0 : testaments[testament]!.Index.Length / EntrySize;
 
 	/// <summary>
-	/// The structure of the module: the table of the versification if it is a known one, else the structure that the
-	/// module itself shows. The module is never read with a structure that does not fit the size of its index.
+	/// The structure of the module: the table of the versification if it is a known one and fits the module, else the
+	/// structure that the module itself shows. The module is never read with a structure that does not fit the size of its index.
 	/// </summary>
 	SwordVersification ResolveVersification(string? name)
 	{
 		var known = SwordVersification.Find(name);
+		string? mismatch = null;
 		if (known != null)
 		{
-			for (int testament = 0; testament < 2; testament++)
-				if (testaments[testament] != null && Entries(testament) != known.Entries(testament == 1))
-					throw new InvalidDataException($"The verse index of the {(testament == 0 ? "Old" : "New")} Testament of the SWORD module {Name} " +
-						$"has {Entries(testament)} entries, but the versification {known.Name} has {known.Entries(testament == 1)}.");
-			return known;
+			for (int testament = 0; testament < 2 && mismatch == null; testament++)
+			{
+				// A testament that the versification has no books in (Leningrad and MT have the Old Testament only) is
+				// not checked: the module may still have an index file for it, with a heading or nothing in it.
+				if (testaments[testament] == null || !known.Books.Any(b => b.NewTestament == (testament == 1))) continue;
+				if (Entries(testament) != known.Entries(testament == 1))
+					mismatch = $"The verse index of the {(testament == 0 ? "Old" : "New")} Testament of the SWORD module {Name} " +
+						$"has {Entries(testament)} entries, but the versification {known.Name} has {known.Entries(testament == 1)}.";
+			}
+			if (mismatch == null) return known;
 		}
 
-		return Derive() ?? throw new NotSupportedException($"The versification '{name}' of the SWORD module {Name} is not known (known: {SwordVersification.Supported}), " +
-			"and its structure cannot be derived from the module, because it does not mark its books and chapters (as OSIS modules made with osis2mod do).");
+		// A module that does not fit the table of its versification (some modules differ in a few verses from the table
+		// of SWORD) or has a versification that is not known is read with the structure that it shows itself.
+		return Derive() ?? throw (known != null
+			? new InvalidDataException(mismatch + " Its structure cannot be derived from the module either, because it does not mark its books and chapters (as OSIS modules made with osis2mod do).")
+			: new NotSupportedException($"The versification '{name}' of the SWORD module {Name} is not known (known: {SwordVersification.Supported}), " +
+				"and its structure cannot be derived from the module, because it does not mark its books and chapters (as OSIS modules made with osis2mod do)."));
 	}
 
 	// The headings of a book and of a chapter are entries of the index of their own. Modules made with osis2mod
@@ -373,7 +489,9 @@ public sealed class SwordModule
 		long offset = BinaryPrimitives.ReadUInt32LittleEndian(t.Index.AsSpan(pos));
 		int size = wide ? (int)BinaryPrimitives.ReadUInt32LittleEndian(t.Index.AsSpan(pos + 4)) : BinaryPrimitives.ReadUInt16LittleEndian(t.Index.AsSpan(pos + 4));
 		if (size == 0 || offset + size > t.Data.Length) return null;
-		return t.Data.AsSpan((int)offset, size).ToArray();
+		var entryBytes = t.Data.AsSpan((int)offset, size).ToArray();
+		cipher?.Decrypt(entryBytes); // every entry is encrypted on its own
+		return entryBytes;
 	}
 
 	byte[]? ReadCompressed(Testament t, int index)
@@ -396,7 +514,9 @@ public sealed class SwordModule
 			int uncompressedSize = (int)BinaryPrimitives.ReadUInt32LittleEndian(t.Blocks.AsSpan((int)blockPos + 8));
 			if (offset + compressedSize > t.Data.Length)
 				throw new InvalidDataException($"A block of the SWORD module {Name} is beyond the end of its data.");
-			t.BlockData = Decompress(t.Data.AsSpan((int)offset, compressedSize), uncompressedSize);
+			var compressedBytes = t.Data.AsSpan((int)offset, compressedSize).ToArray();
+			cipher?.Decrypt(compressedBytes); // the blocks are encrypted after they were compressed, each one on its own
+			t.BlockData = Decompress(compressedBytes, uncompressedSize);
 			t.Block = (int)block;
 		}
 
