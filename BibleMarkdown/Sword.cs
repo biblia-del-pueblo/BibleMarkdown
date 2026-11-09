@@ -314,7 +314,7 @@ public sealed class SwordModule
 	/// <summary>Whether the module has the Old (false) or the New (true) Testament.</summary>
 	public bool Has(bool newTestament) => testaments[newTestament ? 1 : 0] != null;
 
-	static Dictionary<string, string> ReadConf(string file, out string? name)
+	internal static Dictionary<string, string> ReadConf(string file, out string? name)
 	{
 		var conf = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 		name = null;
@@ -406,7 +406,7 @@ public sealed class SwordModule
 
 	byte[] Decompress(ReadOnlySpan<byte> data, int size) => compression == "ZIP" ? Zip(data) : Lzss(data, size);
 
-	static byte[] Zip(ReadOnlySpan<byte> data)
+	internal static byte[] Zip(ReadOnlySpan<byte> data)
 	{
 		using var input = new MemoryStream(data.ToArray());
 		using var zlib = new ZLibStream(input, CompressionMode.Decompress);

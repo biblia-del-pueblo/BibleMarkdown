@@ -54,6 +54,7 @@
         <PackageReference Include="CliWrap" />
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" />
         <PackageReference Include="Newtonsoft.Json" />
+        <PackageReference Include="LiteDB" />
     </ItemGroup>
 
     <ItemGroup>

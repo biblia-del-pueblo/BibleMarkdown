@@ -94,6 +94,21 @@ public class Importer
             }
         }
     }
+    /// <summary>
+    /// Creates the index of all the words of the books in <paramref name="mdpath"/>: a LiteDB database
+    /// (<see cref="WordIndex.FileName"/>, in the same folder) with an entry for every word of every verse, its book,
+    /// chapter and verse, and its place in the verse. See <see cref="WordIndex"/>; the index is searched with
+    /// <see cref="WordIndex.Search"/>.
+    /// </summary>
+    /// <returns>The number of words in the index.</returns>
+    public int CreateIndex(string mdpath)
+    {
+        Log("Create the word index");
+        int count = WordIndex.Create(mdpath);
+        LogFile(Path.Combine(mdpath, WordIndex.FileName), $"Created, {count} words,");
+        return count;
+    }
+
     public void FromBibleMarkdown(string mdpath, string? srcpath = null)
     {
         if (srcpath == null) srcpath = Path.Combine(mdpath, "src");
@@ -638,6 +653,14 @@ public class Importer
 
         if (!Directory.Exists(confpath)) return;
         var confs = Directory.EnumerateFiles(confpath, "*.conf").Order().ToList();
+
+        // Strong's dictionaries (and other dictionaries) are written to a binary file each; the Bible is the rest.
+        foreach (var dictionary in confs.Where(SwordDictionary.IsDictionary).ToList())
+        {
+            FromSWORDDictionary(dictionary, srcpath, mdpath);
+            confs.Remove(dictionary);
+        }
+
         if (confs.Count == 0) return;
         if (confs.Count > 1) Log($"There are several SWORD modules in {confpath}, only {Path.GetFileName(confs[0])} is imported.");
 
@@ -716,6 +739,47 @@ public class Importer
         catch (Exception ex) when (ex is NotSupportedException or InvalidDataException or IOException)
         {
             Log($"The SWORD module {Path.GetFileName(confs[0])} cannot be imported: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Imports a Strong's dictionary module of The SWORD Project (RawLD, RawLD4 or zLD, e.g. StrongsGreek and
+    /// StrongsHebrew) to the LiteDB database <c>strongs.db</c> in <paramref name="mdpath"/>, see <see cref="StrongsDatabase"/>:
+    /// every entry has its Strong's number ("G26", "H7225") as id and its definition as markdown. All imported
+    /// dictionaries share the database. Entries whose key is not a Strong's number (the introduction of the module)
+    /// are left out.
+    /// </summary>
+    public void FromSWORDDictionary(string conf, string srcpath, string mdpath)
+    {
+        try
+        {
+            var dictionary = SwordDictionary.Open(conf, srcpath);
+            Log($"Import from SWORD dictionary {dictionary.Name}");
+            if (dictionary.StrongsPrefix == null)
+                Log($"The SWORD dictionary {dictionary.Name} is not marked as Greek or Hebrew: only entries with keys such as G26 or H7225 are imported.");
+
+            var entries = new List<(string Key, string Markdown)>();
+            foreach (var (key, text) in dictionary.Entries())
+            {
+                var strongs = StrongsDatabase.NormalizeKey(key, dictionary.StrongsPrefix);
+                if (strongs == null) continue;
+                var markdown = StrongsMarkup.ToMarkdown(text);
+                if (markdown.Length > 0) entries.Add((strongs, markdown));
+            }
+            if (entries.Count == 0)
+            {
+                Log($"The SWORD dictionary {dictionary.Name} has no Strong's entries.");
+                return;
+            }
+
+            var file = Path.Combine(mdpath, StrongsDatabase.FileName);
+            StrongsDatabase.Write(file, entries);
+            Imported = true;
+            LogFile(file);
+        }
+        catch (Exception ex) when (ex is NotSupportedException or InvalidDataException or IOException or LiteDB.LiteException)
+        {
+            Log($"The SWORD dictionary {Path.GetFileName(conf)} cannot be imported: {ex.Message}");
         }
     }
 
