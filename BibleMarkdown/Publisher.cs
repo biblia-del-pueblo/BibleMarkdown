@@ -179,8 +179,8 @@ public class Publisher
         Zip(files.Select(file => (file, Path.GetFileName(file))), zip);
 
     /// <summary>Zips a folder with its subfolders into <paramref name="zip"/>.</summary>
-    private static void ZipFolder(string folder, string zip) =>
-        Zip(Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories)
+    private static void ZipFolder(string folder, string zip, SearchOption searchOption = SearchOption.AllDirectories) =>
+        Zip(Directory.EnumerateFiles(folder, "*", searchOption)
             .Select(file => (file, Path.GetRelativePath(folder, file).Replace('\\', '/'))), zip);
 
     // Every entry has the same date and the entries are sorted: the same files give the same zip, byte for byte, so
@@ -237,7 +237,7 @@ public class Publisher
                 if (!Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories).Any()) continue;
                 Directory.CreateDirectory(subtarget);
                 var zip = Path.Combine(subtarget, $"{bible}.{name.ToLowerInvariant()}.zip");
-                ZipFolder(folder, zip);
+                ZipFolder(folder, zip, SearchOption.TopDirectoryOnly);
                 count++;
             }
             else count += CopyOut(folder, subtarget, bible, top: false);

@@ -727,7 +727,7 @@ public class Importer
         var zip = Directory.EnumerateFiles(srcpath, "*.zip").FirstOrDefault();
         if (zip != null && !Directory.Exists(confpath))
         {
-            ZipFile.ExtractToDirectory(zip, srcpath);
+            ZipFile.ExtractToDirectory(zip, srcpath, true);
         }
 
         if (!Directory.Exists(confpath)) return;
