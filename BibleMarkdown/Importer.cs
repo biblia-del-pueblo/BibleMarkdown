@@ -62,6 +62,7 @@ public class Importer
 
         Books = new BookList().Load(mdpath);
         FromZip(mdpath, srcpath);
+        ImportInfo(mdpath, srcpath);
         FromBibleEdit(mdpath, srcpath);
         FromUSFM(mdpath, srcpath);
         FromTXT(mdpath, srcpath);
@@ -107,6 +108,56 @@ public class Importer
         int count = WordIndex.Create(mdpath);
         LogFile(Path.Combine(mdpath, WordIndex.FileName), $"Created, {count} words,");
         return count;
+    }
+
+    /// <summary>The name of the file that stores the <see cref="InstallableBook"/> entry of a Bible, in the folder of its books.</summary>
+    public const string InfoFileName = "info.json";
+
+    /// <summary>
+    /// Reads the <see cref="InstallableBook"/> entry (name, language, country, class ...) that <c>info.json</c> stores.
+    /// </summary>
+    /// <param name="path">The folder of the Bible (it has the info.json), or the info.json itself.</param>
+    /// <returns>The entry, or null when there is no info.json.</returns>
+    /// <exception cref="InvalidDataException">The file is not valid JSON for an entry.</exception>
+    public InstallableBook? ReadInfo(string path)
+    {
+        var file = Directory.Exists(path) ? Path.Combine(path, InfoFileName) : path;
+        if (!File.Exists(file)) return null;
+        try
+        {
+            var json = File.ReadAllText(file, Encoding.UTF8);
+            // The class may be stored as its name ("Bible") or its number.
+            return JsonConvert.DeserializeObject<InstallableBook>(json, new JsonSerializerSettings
+            {
+                Converters = { new Newtonsoft.Json.Converters.StringEnumConverter() },
+            });
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidDataException($"{file} is not a valid {InfoFileName}: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    /// Copies the <see cref="InfoFileName"/> of the sources (in <paramref name="srcpath"/>, or its bibmark folder) to the
+    /// folder of the books, <paramref name="mdpath"/>, where <see cref="ReadInfo"/> finds it. An info.json that is already
+    /// there is replaced.
+    /// </summary>
+    /// <returns>Whether there was an info.json to copy.</returns>
+    public bool ImportInfo(string mdpath, string? srcpath = null)
+    {
+        if (srcpath == null) srcpath = Path.Combine(mdpath, "src");
+        var source = new[] { srcpath, Path.Combine(srcpath, "bibmark") }
+            .Select(folder => Path.Combine(folder, InfoFileName))
+            .FirstOrDefault(File.Exists);
+        if (source == null) return false;
+
+        Directory.CreateDirectory(mdpath);
+        var target = Path.Combine(mdpath, InfoFileName);
+        if (!string.Equals(Path.GetFullPath(source), Path.GetFullPath(target), StringComparison.OrdinalIgnoreCase))
+            File.Copy(source, target, overwrite: true);
+        LogFile(target);
+        return true;
     }
 
     public void FromBibleMarkdown(string mdpath, string? srcpath = null)

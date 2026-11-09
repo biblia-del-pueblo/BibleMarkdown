@@ -340,11 +340,32 @@ Options:
     located in path1 and path2.
   - -strongs
     Import Strong number syntax from USFM files and SWORD modules.
+  - -publish biblesPath wwwPath
+    Zips every Bible folder in biblesPath into wwwPath/books, together with a books/index.json
+    that lists the zips and the info.json of each Bible, and copies the pdf, md, epub, html, xml
+    and zip files of the out folders to wwwPath/out/Bible (the html, tex and usfm folders as one
+    zip each, the pandoc folder not at all).
+    Nothing is converted.
   ");
     }
 
     static async Task Main(string[] args)
     {
+        // Publishing needs neither the installation of bibmark below nor pandoc, so it is the first thing that is looked at
+        // (it is what a build server runs, where bibmark cannot be installed in /usr/bin).
+        // -publish biblesPath wwwPath: zips the Bibles and lists them in an index.json, then ends (no conversion).
+        var publishpos = Array.IndexOf(args, "-publish");
+        if (publishpos >= 0)
+        {
+            if (publishpos + 2 >= args.Length)
+            {
+                Log("Usage: bibmark -publish biblesPath wwwPath");
+                return;
+            }
+            new Publisher().Publish(args[publishpos + 1], args[publishpos + 2]);
+            return;
+        }
+
         // Install bibmark on Linux & macOS systems
         if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
         {
