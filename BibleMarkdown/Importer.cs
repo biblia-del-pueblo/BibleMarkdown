@@ -74,6 +74,7 @@ public class Importer
         ParallelVerses(mdpath);
         Outline(mdpath);
         PostprocessMarkdown(mdpath);
+        ImportInfo(mdpath, srcpath);
     }
 
     public void PostprocessMarkdown(string mdpath)
