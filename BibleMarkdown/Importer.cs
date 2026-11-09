@@ -170,8 +170,10 @@ public class Importer
         if (Directory.Exists(bmpath)) srcpath = bmpath;
         if (!Directory.Exists(srcpath)) return;
         var sources = Directory.EnumerateFiles(srcpath)
-            .Where(file => file.EndsWith(".md", StringComparison.OrdinalIgnoreCase) &&
-            Regex.IsMatch(Path.GetFileName(file), "^[0-9][0-9.]*-"));
+            .Where(file => file.EndsWith(".md", StringComparison.OrdinalIgnoreCase) ||
+            file.EndsWith(".db", StringComparison.OrdinalIgnoreCase) ||
+            file.EndsWith(".json", StringComparison.OrdinalIgnoreCase) ||
+            file.EndsWith(".xml", StringComparison.OrdinalIgnoreCase));
         if (sources.Any())
         {
             Log("Import from Bible Markdown");
@@ -182,12 +184,35 @@ public class Importer
             {
                 var dest = Path.Combine(mdpath, Path.GetFileName(source));
 
-                var srctext = File.ReadAllText(source);
-                var desttext = File.Exists(dest) ? File.ReadAllText(dest) : null;
-                if (srctext != desttext)
-                {
-                    File.Copy(source, dest, true);
-                    LogFile(dest);
+                if (source.EndsWith(".db", StringComparison.OrdinalIgnoreCase))
+                { // binary file
+                    var srcbin = File.ReadAllBytes(source);
+                    var destbin= File.Exists(dest) ? File.ReadAllBytes(dest) : null;
+                    var equal = true;
+                    if (destbin == null) equal = false;
+                    else if (srcbin.Length != destbin.Length) equal = false;
+                    else
+                    {
+                        for (int i = 0; i < srcbin.Length; i++)
+                        {
+                            equal &= srcbin[i] == destbin[i];
+                        }
+                    }
+                    if (!equal)
+                    {
+                        File.Copy(source, dest, true);
+                        LogFile(dest);
+                    }
+                }
+                else
+                { // text file
+                    var srctext = File.ReadAllText(source);
+                    var desttext = File.Exists(dest) ? File.ReadAllText(dest) : null;
+                    if (srctext != desttext)
+                    {
+                        File.Copy(source, dest, true);
+                        LogFile(dest);
+                    }
                 }
             }
         }
