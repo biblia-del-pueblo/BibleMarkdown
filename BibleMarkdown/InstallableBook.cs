@@ -36,6 +36,7 @@ public class InstallableBook
     // Bible has these in BibleReader.
     public string? Name { get; set; }
     public string? EnglishName { get; set; }
+    public virtual string Origin => GetType().Name;
 #endif
 
     public virtual Classes Class { get; set; }
@@ -47,8 +48,6 @@ public class InstallableBook
         get => field ?? Language;
         set => field = value;
     }
-    public virtual string Origin => "";
-
 #if BibleReader
     /// <summary>A verse that matches a search.</summary>
     /// <param name="Position">Where the verse is: its book, chapter and verse.</param>
