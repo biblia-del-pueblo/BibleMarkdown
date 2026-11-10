@@ -3,7 +3,8 @@
     <PropertyGroup>
         <PackAsTool Condition="$(PackAsTool) == ''">false</PackAsTool>
 
-        <TargetFramework>net10.0</TargetFramework>
+        <TargetFrameworks Condition="$(PackAsTool) == 'false'">net10.0;net11.0</TargetFrameworks>
+        <TargetFrameworks Condition="$(PackAsTool) != 'false'">net11.0</TargetFrameworks>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <LangVerison>14</LangVerison>
