@@ -410,12 +410,15 @@ Options:
         var aname = asm.GetName();
         Log($"{aname.Name}, v{aname.Version.Major}.{aname.Version.Minor}.{aname.Version.Build}.{aname.Version.Revision}");
 
-        if (args.Contains("-h") || args.Contains("-help") || args.Contains("-?"))
+        if (args.Contains("-h") || args.Contains("-help") || args.Contains("--help") || args.Contains("-?"))
         {
             ShowHelp();
             return;
         }
 
+        if (args.Contains("-version") || args.Contains("--version") || args.Contains("-v")) {
+            return;
+        }
         Init();
 
         InitPandoc();
