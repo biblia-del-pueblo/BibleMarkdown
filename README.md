@@ -33,10 +33,15 @@ follow a naming schema, of a real number followed by a minus and the name of the
 bible book, e.g. like 01-Genesis.md or 02-Exodus.md. Bibmark only processes files
 with names adhering to that schema. The md files can be constructed from various
 source formats.
-From the Bible Markdown files, bibmark creates Pandoc files in the
-out/pandoc folder, LaTeX files in the out/tex folder, HTML files in the
-out/html folder and USFM files in the out/usfm folder.
 
+## Output
+From the Bible Markdown files, bibmark creates
+- Pandoc files in theout/pandoc folder, LaTeX files in the out/tex folder, HTML files in the
+ out/html folder a.
+-  USFM files in the out/usfm folde.
+-  In the .
+- 
+- 
 If you have the source text of your Bible in USFM markup, you can place
 those files in a subfolder `src`. If you specify the -s argument to bibmark,
 bibmark searches this folder for USFM source and creates Bible Markdown
