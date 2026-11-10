@@ -428,7 +428,7 @@ Options:
         // Get the version of the current application.
         var asm = Assembly.GetExecutingAssembly();
         var aname = asm.GetName();
-        Log($"{aname.Name}, v{aname.Version.Major}.{aname.Version.Minor}.{aname.Version.Build}.{aname.Version.Revision}");
+        Log($"{aname.Name}, v{aname.Version.ToString(3)}");
 
         if (args.Contains("-h") || args.Contains("-help") || args.Contains("--help") || args.Contains("-?"))
         {
