@@ -25,6 +25,7 @@ namespace BibleMarkdown;
 public enum Outputs { Pandoc = 1, Html = 2, TeX = 4, Epub = 8, USFM = 0x10, OSIS = 0x20, Sword = 0x40, All = 0xFFFF, None = 0 };
 public partial class Program
 {
+    const bool InstallGlobal = false;
     public static Importer Import = new Importer();
     public static Creator Create = new Creator();
     static DateTime? bibmarktime = null;
@@ -366,42 +367,54 @@ Options:
             return;
         }
 
-        // Install bibmark on Linux & macOS systems
-        if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+        if (InstallGlobal)
         {
-            if (Directory.Exists("/usr/bin") && !File.Exists("/usr/bin/bibmark"))
+            // Install bibmark on Linux & macOS systems
+            if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             {
-                File.WriteAllText("/usr/bin/bibmark", "#!/bin/bash\ndotnet" + Assembly.GetExecutingAssembly().Location + " \"$@\"\n");
-                Process.Start("chmod", "+x /usr/bin/bibmark")?.WaitForExit();
-                Console.WriteLine("Installed bibmark to /usr/bin/bibmark");
-                return;
+                try
+                {
+                    if (Directory.Exists("/usr/bin") && !File.Exists("/usr/bin/bibmark"))
+                    {
+                        File.WriteAllText("/usr/bin/bibmark", "#!/bin/bash\ndotnet" + Assembly.GetExecutingAssembly().Location + " \"$@\"\n");
+                        Process.Start("chmod", "+x /usr/bin/bibmark")?.WaitForExit();
+                        Console.WriteLine("Installed bibmark to /usr/bin/bibmark");
+                    }
+                }
+                catch { }
             }
-        }
-        else if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-        {
-            if (Directory.Exists("/usr/local/bin") && !File.Exists("/usr/local/bin/bibmark"))
+            else if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
             {
-                File.WriteAllText("/usr/local/bin/bibmark", "#!/bin/bash\ndotnet" + Assembly.GetExecutingAssembly().Location + " \"$@\"\n");
-                Process.Start("chmod", "+x /usr/local/bin/bibmark")?.WaitForExit();
-                Console.WriteLine("Installed bibmark to /usr/local/bin/bibmark");
-                return;
+                try
+                {
+                    if (Directory.Exists("/usr/local/bin") && !File.Exists("/usr/local/bin/bibmark"))
+                    {
+                        File.WriteAllText("/usr/local/bin/bibmark", "#!/bin/bash\ndotnet" + Assembly.GetExecutingAssembly().Location + " \"$@\"\n");
+                        Process.Start("chmod", "+x /usr/local/bin/bibmark")?.WaitForExit();
+                        Console.WriteLine("Installed bibmark to /usr/local/bin/bibmark");
+                    }
+                }
+                catch { }
             }
-        }
-        else if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-        {
-            var userenvpath = Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.User) ?? "";
-			var envpath = new string[] {
+            else if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                try
+                {
+                    var userenvpath = Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.User) ?? "";
+                    var envpath = new string[] {
                 userenvpath,
                 Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.Machine) ?? "",
                 Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.Process) ?? "" };
-			var envpaths = envpath.SelectMany(path => path.Split(';'));
-            if (!envpaths.Any(p => File.Exists(Path.Combine(p, "bibmark.exe"))))
-            {
-				var location = Assembly.GetExecutingAssembly().Location;
-                userenvpath = string.IsNullOrEmpty(userenvpath) ? location : userenvpath + ";" + location;
-				Environment.SetEnvironmentVariable("PATH", userenvpath, EnvironmentVariableTarget.User);
-                Console.WriteLine("Added bibmark to PATH environment variable.");
-                return;
+                    var envpaths = envpath.SelectMany(path => path.Split(';'));
+                    if (!envpaths.Any(p => File.Exists(Path.Combine(p, "bibmark.exe"))))
+                    {
+                        var location = Assembly.GetExecutingAssembly().Location;
+                        userenvpath = string.IsNullOrEmpty(userenvpath) ? location : userenvpath + ";" + location;
+                        Environment.SetEnvironmentVariable("PATH", userenvpath, EnvironmentVariableTarget.User);
+                        Console.WriteLine("Added bibmark to PATH environment variable.");
+                    }
+                }
+                catch { }
             }
         }
 
@@ -419,6 +432,7 @@ Options:
         if (args.Contains("-version") || args.Contains("--version") || args.Contains("-v")) {
             return;
         }
+
         Init();
 
         InitPandoc();

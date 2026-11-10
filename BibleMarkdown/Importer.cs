@@ -162,6 +162,14 @@ public class Importer
         LogFile(target);
         return true;
     }
+    public void ImportBookNames(string mdpath, string? srcpath = null)
+    {
+        const string BooknamesFile = "booknames.xml";
+        if (srcpath == null) srcpath = Path.Combine(mdpath, "src");
+        var source = Path.Combine(srcpath, BooknamesFile);
+        Directory.CreateDirectory(mdpath);
+        if (File.Exists(source)) File.Copy(source, Path.Combine(mdpath, BooknamesFile), true);
+    }
 
     public void FromBibleMarkdown(string mdpath, string? srcpath = null)
     {

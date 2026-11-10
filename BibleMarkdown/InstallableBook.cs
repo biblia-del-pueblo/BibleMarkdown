@@ -18,7 +18,7 @@ namespace BibleMarkdown;
 
 public class InstallableBook
 #if BibleReader
-    : Bible
+    : BookText
 #endif
 {
     public enum Classes
@@ -53,7 +53,7 @@ public class InstallableBook
     /// <param name="Position">Where the verse is: its book, chapter and verse.</param>
     /// <param name="Score">The match score: the number of different searched words in the verse, plus half a point for every two of them that stand next to each other as in the search phrase.</param>
     /// <param name="Markdown">The markdown of the verse, the searched words in bold.</param>
-    public sealed record SearchResult(Bible.VersePosition Position, double Score, string Markdown);
+    public sealed record SearchResult(BookText.VersePosition Position, double Score, string Markdown);
 
     /// <summary>
     /// Searches the Bible for the words of <paramref name="phrase"/>: every word is looked up in the index of the
@@ -77,7 +77,7 @@ public class InstallableBook
             if (Books.Count == 0)
             {
                 var books = OpenFrom(ConfigPath).Books;
-                foreach (var book in books) book.Bible = this;
+                foreach (var book in books) book.BookText = this;
                 Books = books;
             }
             var verses = new Dictionary<int, Dictionary<(int Chapter, int Verse), string>>();
