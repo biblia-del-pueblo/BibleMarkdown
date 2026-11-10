@@ -29,9 +29,12 @@ public partial class Program
     public static Importer Import = new Importer();
     public static Creator Create = new Creator();
     static DateTime? bibmarktime = null;
-    public static DateTime BibmarkTime {
-        get {
-            if (bibmarktime == null) {
+    public static DateTime BibmarkTime
+    {
+        get
+        {
+            if (bibmarktime == null)
+            {
                 var exe = Assembly.GetExecutingAssembly().Location;
                 bibmarktime = File.GetLastWriteTimeUtc(exe);
             }
@@ -43,7 +46,8 @@ public partial class Program
         get => Import.LowercaseFirstWords;
         set => Import.LowercaseFirstWords = value;
     }
-    public static bool ImportStrongs {
+    public static bool ImportStrongs
+    {
         get => Import.ImportStrongs;
         set => Import.ImportStrongs = value;
     }
@@ -54,7 +58,8 @@ public partial class Program
     }
     public static bool FromSource = true;
     public static bool Imported => Import.Imported;
-    public static string SwordVersification {
+    public static string SwordVersification
+    {
         get => Create.SwordVersification;
         set => Create.SwordVersification = value;
     }
@@ -88,11 +93,13 @@ public partial class Program
         set => Create.LeftLanguage = value;
     }
 
-    public static string? Replace {
+    public static string? Replace
+    {
         get => Create.Replace;
         set => Create.Replace = value;
     }
-    public static bool TwoLanguage {
+    public static bool TwoLanguage
+    {
         get => Create.TwoLanguage;
         set => Create.TwoLanguage = value;
     }
@@ -206,11 +213,11 @@ public partial class Program
         var arch = RuntimeInformation.ProcessArchitecture;
         if (arch == Architecture.X86) arch = Architecture.X64;
         var archstr = arch.ToString().ToLower();
-		if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) Pandoc.SetPandocPath(@"runtimes\win\pandoc.exe");
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) Pandoc.SetPandocPath(@"runtimes\win\pandoc.exe");
         else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) Pandoc.SetPandocPath($"linux-{archstr}/pandoc");
         else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) Pandoc.SetPandocPath($"osx-{archstr}/pandoc");
         else throw new PlatformNotSupportedException();
-	}
+    }
 
     static void ShowHelp()
     {
@@ -402,9 +409,9 @@ Options:
                 {
                     var userenvpath = Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.User) ?? "";
                     var envpath = new string[] {
-                userenvpath,
-                Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.Machine) ?? "",
-                Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.Process) ?? "" };
+                        userenvpath,
+                        Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.Machine) ?? "",
+                        Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.Process) ?? "" };
                     var envpaths = envpath.SelectMany(path => path.Split(';'));
                     if (!envpaths.Any(p => File.Exists(Path.Combine(p, "bibmark.exe"))))
                     {
@@ -429,7 +436,8 @@ Options:
             return;
         }
 
-        if (args.Contains("-version") || args.Contains("--version") || args.Contains("-v")) {
+        if (args.Contains("-version") || args.Contains("--version") || args.Contains("-v"))
+        {
             return;
         }
 
