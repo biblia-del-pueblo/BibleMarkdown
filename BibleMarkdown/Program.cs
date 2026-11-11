@@ -330,11 +330,14 @@ Options:
             right = argslist[0];
             argslist.RemoveAt(0);
         }
-        
-        if (command == "import" && argslist.Count >= 1)
+
+        if (command == "import")
         {
-            sourcePath = argslist[0];
-            argslist.RemoveAt(0);
+            if (argslist.Count >= 1 && !argslist[0].StartsWith("-"))
+            {
+                sourcePath = argslist[0];
+               argslist.RemoveAt(0);
+            }
             fromSource = true;
         }
 

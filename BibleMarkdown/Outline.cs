@@ -33,7 +33,7 @@ public class  Outline: List<OutlineItem>
 
     public Outline Read(string path)
     {
-        Outline items = new Outline(Transform);
+        Clear();
 
         var files = Directory.EnumerateFiles(path, "*.md")
             .Where(file => file.EndsWith("outline.md", StringComparison.OrdinalIgnoreCase))
@@ -47,24 +47,25 @@ public class  Outline: List<OutlineItem>
 
         foreach (var file in files)
         {
-            if (file.EndsWith(".md")) items.AddMdOutline(file);
-            else if (file.EndsWith(".xml")) items.AddXmlOutline(file);
+            if (file.EndsWith(".md", StringComparison.OrdinalIgnoreCase)) AddMdOutline(file);
+            else if (file.EndsWith(".xml", StringComparison.OrdinalIgnoreCase)) AddXmlOutline(file);
         }
 
-        items.Sort();
+        Sort();
 
         // remove ParagraphItems that are duplicate of a TitleItem and remove duplicate BookItems and ChapterItems
-        var temp = items;
-        items = new Outline(Transform);
-        items.Append = temp.Append;
+        //var temp = items;
+        //items = new Outline(Transform);
+        //items.Append = temp.Append;
         List<OutlineItem> sameLocation = new List<OutlineItem>(10);
-        for (int i = 0; i < temp.Count;)
+        var deduplicated = new List<OutlineItem>(Count);
+        for (int i = 0; i < Count;)
         {
             int j = i + 1;
-            sameLocation.Add(temp[i]);
-            while (j < temp.Count && Location.Compare(temp[i].Location, temp[j].Location) == 0)
+            sameLocation.Add(this[i]);
+            while (j < Count && Location.Compare(this[i].Location, this[j].Location) == 0)
             {
-                sameLocation.Add(temp[j++]);
+                sameLocation.Add(this[j++]);
             }
             i = j;
             IEnumerable<OutlineItem> toAdd;
@@ -82,13 +83,15 @@ public class  Outline: List<OutlineItem>
                         toAdd.OfType<ChapterItem>()
                             .Take(1)
                     );
-            items.AddRange(toAdd);
+            deduplicated.AddRange(toAdd);
             sameLocation.Clear();
         }
+        Clear();
+        AddRange(deduplicated);
 
         BookItem? bookItem = null;
         // set BookItem items collection
-        foreach (var item in items)
+        foreach (var item in this)
         {
             if (item is BookItem)
             {
@@ -98,7 +101,7 @@ public class  Outline: List<OutlineItem>
             else if (bookItem != null && item.Location.Book.Number == bookItem.Location.Book.Number) bookItem.Items.Add(item);
         }
 
-        return items;
+        return this;
     }
     public string Apply(string srctext, string filename)
     {
