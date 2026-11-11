@@ -92,6 +92,44 @@ public sealed partial class SwordVersification
 	public static string Supported => "KJV, " + string.Join(", ", Systems.Keys);
 
 	/// <summary>
+	/// The built-in versification that fits a Bible best. <paramref name="verses"/> maps a book number (1 to 66) to the
+	/// highest verse number of every chapter. Every chapter that is missing in the table, has another number of verses,
+	/// or is missing in the Bible although its book is present counts as a mismatch; books that the Bible does not
+	/// have are ignored. On equal scores the <paramref name="preferred"/> versification wins, then KJV, then the table order.
+	/// Returns null if there are no verses.
+	/// </summary>
+	public static SwordVersification? Detect(IReadOnlyDictionary<int, int[]> verses, string? preferred, out int mismatches)
+	{
+		mismatches = 0;
+		if (verses.Count == 0) return null;
+
+		SwordVersification? best = null;
+		int bestScore = int.MaxValue;
+		var candidates = new[] { KJV }.Concat(Systems.Values.Select(system => system.Value));
+		foreach (var candidate in candidates)
+		{
+			int score = 0;
+			foreach (var (number, counts) in verses)
+			{
+				var book = candidate.Books.FirstOrDefault(b => b.Number == number);
+				if (book == null) { score += counts.Length; continue; }
+				for (int chapter = 0; chapter < Math.Max(book.Chapters, counts.Length); chapter++)
+				{
+					if (chapter >= book.Chapters || chapter >= counts.Length || book.Verses[chapter] != counts[chapter]) score++;
+				}
+			}
+			var preferredWins = score == bestScore && candidate.Name.Equals(preferred, StringComparison.OrdinalIgnoreCase);
+			if (score < bestScore || preferredWins)
+			{
+				best = candidate;
+				bestScore = score;
+			}
+		}
+		mismatches = bestScore;
+		return best;
+	}
+
+	/// <summary>
 	/// A versification of the table of SWORD (see SwordVersifications.cs). The books of the canon are numbered 1 to 66
 	/// as in KJV, the others from 67 on in the order of the table; the names are the English ones.
 	/// </summary>

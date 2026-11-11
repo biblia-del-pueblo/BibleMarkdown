@@ -40,7 +40,13 @@ public class Creator: WithTransform
             return culture?.Name ?? "en";
         }
     }
-    public string SwordVersification { get; set; } = "KJV";
+    string? swordVersification;
+    public string SwordVersification {
+        get => swordVersification ?? DetectedVersification;
+        set => swordVersification = value;
+    };
+    /// <summary>The SWORD versification that best fits the verses of the Bible; set by <see cref="ToVerseStats"/>.</summary>
+    public string? DetectedVersification { get; private set; }
     public bool TwoLanguage { get; set; } = false;
 
     Epub? epub;
@@ -362,7 +368,8 @@ public class Creator: WithTransform
 
     public async Task ToSWORDAsync(string osisFile, string swordPath, string? versification = null)
     {
-        if (versification == null) versification = SwordVersification;
+        // an explicit argument wins, then the versification that ToVerseStats detected from the text, then the configured one
+        if (versification == null) versification = DetectedVersification ?? SwordVersification;
         if (!Output.HasFlag(Outputs.Sword)) return;
 
         var osis2mod = Pandoc.Find("osis2mod");
@@ -540,12 +547,17 @@ public class Creator: WithTransform
         var frametime = DateTime.MinValue;
         if (File.Exists(frames)) frametime = File.GetLastWriteTimeUtc(frames);
 
-        if (sources.All(src => File.GetLastWriteTimeUtc(src) < frametime) && frametime > BibmarkTime) return;
+        // the stats are always calculated, because the versification is detected from them; the file is only written if it is outdated
+        bool upToDate = sources.All(src => File.GetLastWriteTimeUtc(src) < frametime) && frametime > BibmarkTime;
+
+        // book number (1-66) -> highest verse number of every chapter
+        var bookVerses = new Dictionary<int, int[]>();
 
         bool firstsrc = true;
         int btotal = 0;
         foreach (var source in sources)
         {
+            var chapterVerses = new SortedDictionary<int, int>();
 
             if (!firstsrc) verses.AppendLine();
             firstsrc = false;
@@ -563,6 +575,7 @@ public class Creator: WithTransform
                 if (m.Groups[1].Success)
                 {
                     int.TryParse(m.Groups["chapter"].Value, out chapter);
+                    chapterVerses.TryAdd(chapter, 0);
                     if (verse != 0)
                     {
                         verses.Append(verse);
@@ -576,15 +589,27 @@ public class Creator: WithTransform
                 {
                     int.TryParse(m.Groups["verse"].Value, out verse);
                     nverses = Math.Max(nverses, verse);
+                    if (chapter > 0) chapterVerses[chapter] = Math.Max(chapterVerses.GetValueOrDefault(chapter), verse);
 
                 }
                 else if (m.Groups["verse2"].Success)
                 {
                     int.TryParse(m.Groups["verse2"].Value, out verse);
                     nverses = Math.Max(nverses, verse);
-
+                    if (chapter > 0) chapterVerses[chapter] = Math.Max(chapterVerses.GetValueOrDefault(chapter), verse);
                 }
             }
+
+            // only the books of the canon (files like 01-Genesis.md) are used to detect the versification
+            var booknumber = Regex.Match(Path.GetFileName(source), @"^([0-9]+)-");
+            if (booknumber.Success && chapterVerses.Count > 0)
+            {
+                var number = int.Parse(booknumber.Groups[1].Value);
+                var counts = new int[chapterVerses.Keys.Max()];
+                foreach (var (ch, max) in chapterVerses) counts[ch - 1] = max;
+                if (number is >= 1 and <= 66) bookVerses[number] = counts;
+            }
+
             if (verse != 0) verses.Append(verse);
             totalverses += nverses;
             nverses = 0;
@@ -597,6 +622,16 @@ public class Creator: WithTransform
         }
 
         verses.AppendLine(); verses.AppendLine(); verses.AppendLine(btotal.ToString());
+
+        // the SWORD versification is the one of the table that fits the verses best
+        var detected = BibleMarkdown.SwordVersification.Detect(bookVerses, SwordVersification, out int mismatches);
+        if (detected != null)
+        {
+            DetectedVersification = detected.Name;
+            if (!upToDate) Log($"Versification: {detected.Name}" + (mismatches > 0 ? $" (best match, {mismatches} chapters differ)" : ""));
+        }
+
+        if (upToDate) return;
 
         File.WriteAllText(frames, verses.ToString());
         LogFile(frames);
@@ -795,6 +830,7 @@ public class Creator: WithTransform
             ToVerseStats();
             var osisFile = Path.Combine(OutputPath, "osis", $"{Path.GetFileName(ProjectPath)}.xml");
             ToOSIS(files, osisFile);
+            // ToVerseStats has set DetectedVersification, which ToSWORDAsync uses
             await ToSWORDAsync(osisFile, Path.Combine(OutputPath, "out", "sword", "modules", "texts", "ztext", Path.GetFileName(OutputPath)));
             Log("Convert to Pandoc...");
             await Task.WhenAll(files.AsParallel().Select(file => TransformFileAsync(file)));
