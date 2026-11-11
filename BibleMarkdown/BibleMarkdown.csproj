@@ -72,15 +72,13 @@
 
 
     <ItemGroup Condition="$(PackAsTool) == 'true'">
-        <None Update="runtimes\**\*.*"
-            Pack="True" PackagePath="/tools/net11.0/any">
+        <None Update="runtimes\**\*.*" Pack="True" PackagePath="/tools/net11.0/any">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>
     </ItemGroup>
     
     <ItemGroup Condition="$(PackAsTool) != 'true'">
-        <None Update="runtimes\**\*.*"
-            Pack="True" PackagePath="/lib/net11.0">
+        <None Update="runtimes\**\*.*" Pack="True" PackagePath="/lib/net11.0">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>
     </ItemGroup>

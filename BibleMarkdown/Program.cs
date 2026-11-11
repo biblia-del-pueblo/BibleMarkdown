@@ -258,7 +258,7 @@ Options:
         if (args.Contains("-version") || args.Contains("--version") || args.Contains("-v"))
         {
             Transform = new Transform("");
-            Log($"pandoc version: {Transform.Pandoc.Version.ToString(3)}");
+            Log($"pandoc version: {Transform.Pandoc.Version.ToString()}");
             return;
         }
 

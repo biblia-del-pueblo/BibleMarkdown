@@ -2,7 +2,7 @@
   "profiles": {
     "BibleMarkdown": {
       "commandName": "Project",
-      "commandLineArgs": "import",
+      "commandLineArgs": "-v",
       "workingDirectory": "C:\\GitHub\\BibliaLibre\\Bibles\\English.WorldEnglishBibleUS"
     },
     "WSL": {
