@@ -12,7 +12,7 @@ namespace BibleMarkdown
         public static Creator Create => Transform.Create;
         public static Publisher Publish => Transform.Publish;
         public static BookList Books => Transform.Books;
-        public static string? Language => Transform.Language;
+        public static string Language => Transform.Language;
         public static bool ParagraphVerses => Transform.ParagraphVerses;
         public static Pandoc Pandoc => Transform.Pandoc;
         public static ISimpleLogger Logger => Transform.Logger;

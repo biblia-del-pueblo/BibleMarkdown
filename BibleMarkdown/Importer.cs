@@ -155,13 +155,10 @@ public class Importer: WithTransform
 
         var srcpath = base.SourcePath;
         var bmpath = Path.Combine(srcpath, "bibmark");
-        if (Directory.Exists(bmpath)) srcpath = bmpath;
-        else if (!Directory.Exists(srcpath)) return this;
-        var sources = Directory.EnumerateFiles(SourcePath)
-            .Where(file => file.EndsWith(".md", StringComparison.OrdinalIgnoreCase) ||
-            file.EndsWith(".db", StringComparison.OrdinalIgnoreCase) ||
-            file.EndsWith(".json", StringComparison.OrdinalIgnoreCase) ||
-            file.EndsWith(".xml", StringComparison.OrdinalIgnoreCase));
+        if (!Directory.Exists(bmpath)) return this;
+        var sources = Directory.EnumerateFiles(bmpath)
+            .Where(file => Regex.IsMatch(Path.GetFileName(file), @".md$|.db$|.json$|.xml$",
+                RegexOptions.Singleline | RegexOptions.IgnoreCase));
         if (sources.Any())
         {
             Log("Import from Bible Markdown");

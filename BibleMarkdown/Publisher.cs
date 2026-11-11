@@ -72,7 +72,7 @@ public class Publisher: WithTransform
             }
 
             var name = Path.GetFileName(folder) + ".zip";
-            ZipFiles(files, Path.Combine(booksPath, name));
+            ZipFiles(files, Path.Combine(booksPath, name), file => "bibmark/" + file);
             Log($"Created {BooksFolder}/{name}");
 
             index.Add(new JObject { ["File"] = name, ["Info"] = ReadInfo(files) });
@@ -175,13 +175,17 @@ public class Publisher: WithTransform
     };
 
     /// <summary>Zips the files (without folders) into <paramref name="zip"/>.</summary>
-    private static void ZipFiles(IEnumerable<string> files, string zip) =>
-        Zip(files.Select(file => (file, Path.GetFileName(file))), zip);
+    private static void ZipFiles(IEnumerable<string> files, string zip, Func<string, string?>? filter = null) =>
+        Zip(files.Select(file => (File: file, Entry: filter?.Invoke(Path.GetFileName(file))))
+            .Where(file => file.Entry != null)
+            .OfType<(string File, string Entry)>(), zip);
 
     /// <summary>Zips a folder with its subfolders into <paramref name="zip"/>.</summary>
-    private static void ZipFolder(string folder, string zip, SearchOption searchOption = SearchOption.AllDirectories) =>
+    private static void ZipFolder(string folder, string zip, SearchOption searchOption = SearchOption.AllDirectories, Func<string, string?>? filter = null) =>
         Zip(Directory.EnumerateFiles(folder, "*", searchOption)
-            .Select(file => (file, Path.GetRelativePath(folder, file).Replace('\\', '/'))), zip);
+            .Select(file => (File:file, Entry: filter?.Invoke(Path.GetRelativePath(folder, file).Replace(Path.DirectorySeparatorChar, '/'))))
+            .Where(file => file.Entry != null)
+            .OfType<(string File, string Entry)>(), zip);
 
     // Every entry has the same date and the entries are sorted: the same files give the same zip, byte for byte, so
     // that publishing again does not change a zip (and a git repository that holds the site does not grow with every run).
@@ -237,7 +241,7 @@ public class Publisher: WithTransform
                 if (!Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories).Any()) continue;
                 Directory.CreateDirectory(subtarget);
                 var zip = Path.Combine(subtarget, $"{bible}.{name.ToLowerInvariant()}.zip");
-                ZipFolder(folder, zip, SearchOption.TopDirectoryOnly);
+                ZipFolder(folder, zip, SearchOption.TopDirectoryOnly, file => );
                 count++;
             }
             else count += CopyOut(folder, subtarget, bible, top: false);
@@ -245,8 +249,7 @@ public class Publisher: WithTransform
         return count;
     }
 
-    private static bool IsBook(string file) =>
-        file.EndsWith(".md", StringComparison.OrdinalIgnoreCase) && Regex.IsMatch(Path.GetFileName(file), "^[0-9.]+-");
+    private static bool IsBook(string file) => Regex.IsMatch(Path.GetFileName(file), "^[0-9.]+-.*?.md$|.db$|.info$|.xml$");
 
     /// <summary>The content of the info.json among the files, or null when there is none or it is not valid JSON.</summary>
     private JToken? ReadInfo(IEnumerable<string> files)

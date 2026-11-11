@@ -25,7 +25,7 @@ namespace BibleMarkdown
         {
             Transform = transform;
             File = file;
-            if (!string.IsNullOrEmpty(File)) IO.File.WriteAllText(file, "");
+            if (!string.IsNullOrEmpty(File)) IO.File.WriteAllText(File, "");
         }
         public void Log(string message)
         {

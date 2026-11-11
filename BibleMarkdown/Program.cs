@@ -285,11 +285,11 @@ Options:
         if (sourcePos >= 0)
         {
             fromSource = true;
-            argslist.RemoveAt(projectPos);
+            argslist.RemoveAt(sourcePos);
             if (sourcePos < argslist.Count && !argslist[sourcePos].StartsWith("-"))
             {
                 sourcePath = argslist[sourcePos];
-                argslist.RemoveAt(projectPos);
+                argslist.RemoveAt(sourcePos);
             }
         }
         var outPos = argslist.IndexOf("-o");
@@ -306,6 +306,7 @@ Options:
         var lnpos = argslist.IndexOf("-ln");
         if (lnpos < 0) lnpos = argslist.IndexOf("--language");
         if (lnpos >= 0 && lnpos < argslist.Count - 1) {
+            argslist.RemoveAt(lnpos);
             language = argslist[lnpos];
             argslist.RemoveAt(lnpos);
         } else language = "default";
@@ -358,6 +359,8 @@ Options:
             }
             else break;
         }
+
+        projectPath ??= Environment.CurrentDirectory;
 
         if (Directory.Exists(projectPath))
         {

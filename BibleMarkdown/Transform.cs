@@ -32,7 +32,7 @@ namespace BibleMarkdown
             get => books ??= new BookList(this);
             set => books = value;
         }
-        public string? Language { get; set; } = "default";
+        public string Language { get; set; } = "default";
         public bool ParagraphVerses { get; set; }
         ISimpleLogger logger;
         public ISimpleLogger Logger {
@@ -57,8 +57,12 @@ namespace BibleMarkdown
         {
             if (ProjectPath == "") ProjectPath = Environment.CurrentDirectory;
             ProjectPath = Path.GetFullPath(projectPath);
-            this.sourcePath = Path.IsPathRooted(sourcePath) ? sourcePath : Path.GetFullPath(Path.Combine(ProjectPath, sourcePath));
-            this.outputPath = Path.IsPathRooted(outputPath) ? outputPath : Path.GetFullPath(Path.Combine(ProjectPath, outputPath));
+            if (sourcePath != null) {
+                this.sourcePath = Path.IsPathRooted(sourcePath) ? sourcePath : Path.GetFullPath(Path.Combine(ProjectPath, sourcePath));
+            }
+            if (outputPath != null) {
+                this.outputPath = Path.IsPathRooted(outputPath) ? outputPath : Path.GetFullPath(Path.Combine(ProjectPath, outputPath));
+            }
         }
         public Transform(Transform transform, string projectPath)
         {
@@ -228,7 +232,7 @@ namespace BibleMarkdown
                     Current = this;
                     var result = await CSharpScript.RunAsync(txt, ScriptOptions.Default
                         .WithReferences(typeof(Program).Assembly)
-                        .WithImports("static Bibmark = BibleMarkdown.Bibmark"));
+                        .WithImports("BibleMarkdown.Bibmark"));
                 }
             }
             catch (Exception e)
@@ -269,7 +273,7 @@ namespace BibleMarkdown
             get => Transform.Books;
             set => Transform.Books = value;
         }
-        public string? Language
+        public string Language
         {
             get => Transform.Language;
             set => Transform.Language = value;

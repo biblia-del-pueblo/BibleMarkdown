@@ -23,10 +23,9 @@ public class BookList : SortedList<string?, SortedList<string?, Book>>
 	Transform Transform { get; set; }
 	public BookList(Transform transform) {
 		Transform = transform;
-		Add(null, new SortedList<string?, Book>());
 		Add("default", new SortedList<string?, Book>());
     }
-	string? Language
+	string Language
 	{
 		get => Transform.Language;
 		set => Transform.Language = value;
@@ -151,7 +150,7 @@ public class ParallelVerse
 public class ParallelVerses : List<ParallelVerse>
 {
 	public Transform Transform { get; private set; }
-	public string? Language => Transform.Language;
+	public string Language => Transform.Language;
 	public BookList Books => Transform.Books;
 	public ParallelVerses(Transform tranform): base() { Transform = tranform; }
 	public void Log(string message) => Transform.Log(message);
@@ -231,7 +230,7 @@ public class VerseMaps : Dictionary<string, SortedList<Location, Location>>
 {
 	Transform Transform { get; set; }
 	BookList Books => Transform.Books;
-	string? Language => Transform.Language;
+	string Language => Transform.Language;
 	public VerseMaps(Transform transform) { Transform = transform; }
 	public void Log(string message) => Transform.Log(message);
 	public Location Map(Location verse)
