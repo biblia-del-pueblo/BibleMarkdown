@@ -1139,7 +1139,7 @@ public class Importer: WithTransform
     {
         if (!Disabled && Imported)
         {
-            var mdfiles = Directory.EnumerateFiles(SourcePath, "*.md")
+            var mdfiles = Directory.EnumerateFiles(ProjectPath, "*.md")
                 .Where(file => Regex.IsMatch(Path.GetFileName(file), @"^([0-9][0-9])(?!.*?\.outline\.md)"));
 
             Books.Load(mdfiles);

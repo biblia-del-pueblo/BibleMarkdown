@@ -57,8 +57,8 @@ namespace BibleMarkdown
         }
         public Transform(string projectPath, string? sourcePath = null, string? outputPath = null, ISimpleLogger logger = null)
         {
-            if (ProjectPath == "") ProjectPath = Environment.CurrentDirectory;
-            ProjectPath = Path.GetFullPath(projectPath);
+            if (projectPath == "") ProjectPath = Environment.CurrentDirectory;
+            else ProjectPath = Path.GetFullPath(projectPath);
             if (sourcePath != null) {
                 this.sourcePath = Path.IsPathRooted(sourcePath) ? sourcePath : Path.GetFullPath(Path.Combine(ProjectPath, sourcePath));
             }
