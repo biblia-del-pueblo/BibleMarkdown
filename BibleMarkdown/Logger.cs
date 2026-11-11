@@ -33,6 +33,8 @@ namespace BibleMarkdown
         }
         public void Log(string message)
         {
+            if (string.IsNullOrWhiteSpace(message)) return;
+            
             var line = message + Environment.NewLine;
             lock (this)
             {

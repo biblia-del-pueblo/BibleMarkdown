@@ -5,7 +5,7 @@
     <File Path="push-to-nuget.bat" />
   </Folder>
   <Project Path="BibleMarkdown.Msi/BibleMarkdown.Msi.vdproj" Type="Installer">
-    <Build />
+    <Build Solution="Release|*" />
   </Project>
   <Project Path="BibleMarkdown/BibleMarkdown.csproj" />
 </Solution>

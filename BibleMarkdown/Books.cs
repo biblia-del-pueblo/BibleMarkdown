@@ -123,8 +123,8 @@ public class BookList : SortedList<string?, SortedList<string?, Book>>
 
 		foreach (var file in mdfiles)
 		{
-			var book = new Book() { Language = null, Abbreviation = "", Name = Name(file), Number = Number(file) };
-			books.Add(book.Name, book);
+			var book = new Book() { Language = "default", Abbreviation = "", Name = Name(file), Number = Number(file) };
+			if (!books.ContainsKey(book.Name)) books.Add(book.Name, book);
 		}
 		return this;
 	}
