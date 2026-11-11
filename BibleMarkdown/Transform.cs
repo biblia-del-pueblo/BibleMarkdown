@@ -35,7 +35,7 @@ namespace BibleMarkdown
             set => books = value;
         }
         public string Language { get; set; } = "default";
-        public bool ParagraphVerses { get; set; }
+        public bool ParagraphVerses { get; set; } = true;
         ISimpleLogger logger;
         public ISimpleLogger Logger {
             get => logger ??= new ConsoleAndFileLogger(this);
