@@ -183,6 +183,8 @@ public static class WordIndex
 
     // ---- Creating the index ------------------------------------------------------------------------------
 
+    public static bool IsBible(string markdown) => Regex.IsMatch(markdown, @"\A(?=[\s\S]*@\d)(?![\s\S]*^#[ \t]+(?!\d+[ \t]*\r?$))", RegexOptions.Multiline);
+
     /// <summary>
     /// Creates the index of the markdown books (the files such as 01-Genesis.md) in <paramref name="mdpath"/> as the
     /// database <see cref="FileName"/> in the same folder; an existing one is replaced.
@@ -206,7 +208,11 @@ public static class WordIndex
         foreach (var bookFile in books)
         {
             int book = int.Parse(Regex.Match(Path.GetFileName(bookFile), "^[0-9]+").Value);
-            foreach (var (chapter, verse, text) in Verses(File.ReadAllText(bookFile)))
+
+            var markdown = File.ReadAllText(bookFile);
+            if (!IsBible(markdown)) continue;
+
+            foreach (var (chapter, verse, text) in Verses(markdown))
             {
                 int position = 0;
                 foreach (var word in Tokenize(text).SelectMany(t => t.Words))

@@ -10,6 +10,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Linq;
+using System.Numerics.Colors;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
@@ -21,204 +22,12 @@ using System.Xml.Linq;
 
 namespace BibleMarkdown;
 
-[Flags]
-public enum Outputs { Pandoc = 1, Html = 2, TeX = 4, Epub = 8, USFM = 0x10, OSIS = 0x20, Sword = 0x40, All = 0xFFFF, None = 0 };
-public partial class Program
+internal class Program
 {
     const bool InstallGlobal = false;
-    public static Importer Import = new Importer();
-    public static Creator Create = new Creator();
-    static DateTime? bibmarktime = null;
-    public static DateTime BibmarkTime
-    {
-        get
-        {
-            if (bibmarktime == null)
-            {
-                var exe = Assembly.GetExecutingAssembly().Location;
-                bibmarktime = File.GetLastWriteTimeUtc(exe);
-            }
-            return bibmarktime.Value;
-        }
-    }
-    public static bool LowercaseFirstWords
-    {
-        get => Import.LowercaseFirstWords;
-        set => Import.LowercaseFirstWords = value;
-    }
-    public static bool ImportStrongs
-    {
-        get => Import.ImportStrongs;
-        set => Import.ImportStrongs = value;
-    }
-    public static bool EachVerseOnNewLine
-    {
-        get => Import.EachVerseOnNewLine;
-        set => Import.EachVerseOnNewLine = value;
-    }
-    public static bool FromSource = true;
-    public static bool Imported => Import.Imported;
-    public static string SwordVersification
-    {
-        get => Create.SwordVersification;
-        set => Create.SwordVersification = value;
-    }
-    public static bool Help = false;
-    public static bool ParagraphVerses = true;
-    public static Func<string, string> Preprocess = s => s;
-    public static Func<string, string> PreprocessImportUSFM = s => s;
-    static string language;
-    public static string Language
-    {
-        get { return language; }
-        set
-        {
-            if (value != language)
-            {
-                language = value;
-                Log($"Language set to {language}");
-            }
-        }
-    }
+    static bool Help = false;
 
-
-    public static string? RightLanguage
-    {
-        get => Create.RightLanguage;
-        set => Create.RightLanguage = value;
-    }
-    public static string? LeftLanguage
-    {
-        get => Create.LeftLanguage;
-        set => Create.LeftLanguage = value;
-    }
-
-    public static string? Replace
-    {
-        get => Create.Replace;
-        set => Create.Replace = value;
-    }
-    public static bool TwoLanguage
-    {
-        get => Create.TwoLanguage;
-        set => Create.TwoLanguage = value;
-    }
-
-    public struct Footnote
-    {
-        public int Index;
-        public int FIndex;
-        public string Value;
-
-        public Footnote(int Index, int FIndex, string Value)
-        {
-            this.Index = Index;
-            this.FIndex = FIndex;
-            this.Value = Value;
-        }
-    }
-
-    public static void LogFile(string file)
-    {
-        LogFile(file, "Created");
-    }
-    public static void LogFile(string file, string label)
-    {
-        var current = Directory.GetCurrentDirectory();
-        if (file.StartsWith(current))
-        {
-            file = file.Substring(current.Length);
-        }
-        Log($"{label} {file}");
-    }
-
-    static StringBuilder log = new StringBuilder();
-    public static void Log(string text)
-    {
-        if (!string.IsNullOrWhiteSpace(text))
-        {
-            lock (log)
-            {
-                log.AppendLine(text);
-                Console.WriteLine(text);
-            }
-        }
-    }
-    public static bool IsNewer(string file, string srcfile)
-    {
-        var srctime = DateTime.MaxValue;
-        if (File.Exists(srcfile)) srctime = File.GetLastWriteTimeUtc(srcfile);
-        var filetime = DateTime.MinValue;
-        if (File.Exists(file)) filetime = File.GetLastWriteTimeUtc(file);
-        return filetime > srctime && filetime > BibmarkTime;
-    }
-
-    static async Task ProcessPath(string path)
-    {
-        RunScript(path);
-        var srcpath = Path.Combine(path, "src");
-        var outpath = Path.Combine(path, "out");
-        Directory.CreateDirectory(outpath);
-        if (Directory.Exists(srcpath) && FromSource)
-        {
-            Import.All(path, srcpath);
-        }
-
-        await Create.ToAllAsync(path);
-
-        File.WriteAllText(Path.Combine(outpath, "bibmark.log"), log.ToString());
-        log.Clear();
-    }
-
-    static void RunScript(string path)
-    {
-        var file = Path.Combine(path, "src", "script.cs");
-        if (!File.Exists(file)) return;
-
-        var txt = File.ReadAllText(file);
-        LogFile(file, "Run script");
-
-        try
-        {
-            var result = CSharpScript.RunAsync(txt, ScriptOptions.Default
-            .WithReferences(typeof(Program).Assembly)
-            .WithImports("BibleMarkdown"));
-            result.Wait();
-        }
-        catch (Exception e)
-        {
-            Log(e.ToString());
-        }
-
-    }
-
-    static void ProcessTwoLanguagesPath(string path, string path1, string path2)
-    {
-        TwoLanguage = true;
-        var outpath = Path.Combine(path, "out");
-        if (!Directory.Exists(outpath)) Directory.CreateDirectory(outpath);
-
-        // ProcessPath(path1);
-        // ProcessPath(path2);
-        RunScript(path);
-        Books.Load(path);
-        Create.ToTwoLanguage(path, path1, path2);
-        var files = Directory.EnumerateFiles(path, "*.md");
-        Task.WaitAll(files.AsParallel().Select(file => Create.ProcessFileAsync(file)).ToArray());
-        File.WriteAllText(Path.Combine(outpath, "bibmark.log"), log.ToString());
-        log.Clear();
-    }
-    static void InitPandoc()
-    {
-        var arch = RuntimeInformation.ProcessArchitecture;
-        if (arch == Architecture.X86) arch = Architecture.X64;
-        var archstr = arch.ToString().ToLower();
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) Pandoc.SetPandocPath(@"runtimes\win\pandoc.exe");
-        else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) Pandoc.SetPandocPath($"linux-{archstr}/pandoc");
-        else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) Pandoc.SetPandocPath($"osx-{archstr}/pandoc");
-        else throw new PlatformNotSupportedException();
-    }
-
+    static void Log(string message) => Console.WriteLine(message);
     static void ShowHelp()
     {
         Log(@"Bibmark usage:
@@ -327,33 +136,43 @@ you can have a look at the Bibles in the BibliaLibre project at
 https://github.com/biblia-del-pueblo/BibliaLibre.
 
 Options:
-  - -s, -src or -source:
+  - -p, -project or --project <project path>
+    The path of the bible project to process. Defaults to the current direcroty if ommited.
+  - -s, -src, -source or --source [source path]
     If you want to import text from the src folder you need to specify this option when
-    calling bibmark.
-  - -cp:
-    (Continuous Paragraph) 
+    calling bibmark. You can optionally specify a source path, it defaults to src when 
+    ommited. If a relative path is specified, it is relative to the project path or current
+    directory.
+ - -o, -out or --out <output path>
+    With this option you can specify the output path. For a relative path, it is relative
+    to the project path or current directory.
+  - -cp or --continuous-paragraphs
+    (Continuous Paragraphs) 
     If you do not want to start each verse on a newline, but the whole paragraph on a
     single line, you can specify this option. Placing each verse on a newline is more git
     friendly, where as placing it on a single line is more readable.
-  - -ln language:
+  - -ln or --language <language>
     With this option you can specify a language. The language is used to determine
     Book names from booknames.xml.
-  - -r or -replace replacementtext
+  - -r, -replace or --replace <replacementtext>
     The first letter of repacementtext is used as token delimiter. replacementtext is
     then split into tokens. Every pair of tokens describes a global replacement directive,
     where the first token is a Regex expression, and the second token is a
     Regex replacement string.
-  - -twolanguage path1 path2
+  - -twolanguage or --twolanguage <path1> <path2>
     Produces a double column, two language bible, with the single language bibles
     located in path1 and path2.
-  - -strongs
+  - -strongs or --strongs
     Import Strong number syntax from USFM files and SWORD modules.
-  - -publish biblesPath wwwPath
+  - -publish or --publish <biblesPath> <wwwPath>
     Zips every Bible folder in biblesPath into wwwPath/books, together with a books/index.json
     that lists the zips and the info.json of each Bible, and copies the pdf, md, epub, html, xml
     and zip files of the out folders to wwwPath/out/Bible (the html, tex and usfm folders as one
     zip each, the pandoc folder not at all).
     Nothing is converted.
+    Use this option to create an online repository of Bibles for CorssBible reader.
+  - -v, -version or --version
+    Displays the bibmark & pandoc version.
   ");
     }
 
@@ -362,7 +181,10 @@ Options:
         // Publishing needs neither the installation of bibmark below nor pandoc, so it is the first thing that is looked at
         // (it is what a build server runs, where bibmark cannot be installed in /usr/bin).
         // -publish biblesPath wwwPath: zips the Bibles and lists them in an index.json, then ends (no conversion).
+        Transform? Transform;
+        string? projectPath = null, sourcePath = null, outputPath = null;
         var publishpos = Array.IndexOf(args, "-publish");
+        if (publishpos < 0) publishpos = Array.IndexOf(args, "--publish");
         if (publishpos >= 0)
         {
             if (publishpos + 2 >= args.Length)
@@ -370,7 +192,10 @@ Options:
                 Log("Usage: bibmark -publish biblesPath wwwPath");
                 return;
             }
-            new Publisher().Publish(args[publishpos + 1], args[publishpos + 2]);
+            sourcePath = args[publishpos + 1];
+            var destPath = args[publishpos + 2];
+            Transform = new Transform("", sourcePath, destPath);
+            Transform.Publish.Bibles();
             return;
         }
 
@@ -426,8 +251,7 @@ Options:
         }
 
         // Get the version of the current application.
-        var asm = Assembly.GetExecutingAssembly();
-        var aname = asm.GetName();
+        var aname = Assembly.GetExecutingAssembly().GetName();
         Log($"{aname.Name}, v{aname.Version.ToString(3)}");
 
         if (args.Contains("-h") || args.Contains("-help") || args.Contains("--help") || args.Contains("-?"))
@@ -438,67 +262,134 @@ Options:
 
         if (args.Contains("-version") || args.Contains("--version") || args.Contains("-v"))
         {
+            Transform = new Transform("");
+            Log($"pandoc version: {Transform.Pandoc.Version.ToString(3)}");
             return;
         }
 
-        Init();
-
-        InitPandoc();
-        //var process = Process.GetCurrentProcess();
-        //var exe = process.MainModule.FileName;
-
-        LowercaseFirstWords = args.Contains("-plc");
-        EachVerseOnNewLine = !args.Contains("-cp");
-        FromSource = args.Contains("-s") || args.Contains("-src") || args.Contains("-source");
-        ImportStrongs = args.Contains("-strongs");
-        var lnpos = Array.IndexOf(args, "-ln");
-        if (lnpos >= 0 && (lnpos + 1 < args.Length)) Language = args[lnpos + 1];
-        else Language = "default";
-
-        var replacepos = Array.IndexOf(args, "-replace");
-        if (replacepos == -1) replacepos = Array.IndexOf(args, "-r");
-        if (replacepos >= 0 && replacepos + 1 < args.Length) Replace = args[replacepos + 1];
-
-        var twolangpos = Array.IndexOf(args, "-twolanguage");
-        if (twolangpos >= 0 && twolangpos + 2 < args.Length)
+        var argslist = args.ToList();
+        var projectPos = argslist.IndexOf("-p");
+        if (projectPos < 0) projectPos = argslist.IndexOf("-project");
+        if (projectPos < 0) projectPos = argslist.IndexOf("--project");
+        if (projectPos >= 0 && projectPos < argslist.Count - 1)
         {
-            var left = args[twolangpos + 1];
-            var right = args[twolangpos + 2];
-            var p = Directory.GetCurrentDirectory();
-            ProcessTwoLanguagesPath(p, left, right);
-            return;
+            argslist.RemoveAt(projectPos);
+            projectPath = args[projectPos];
+            argslist.RemoveAt(projectPos);
         }
-        var paths = args.ToList();
-        for (int i = 0; i < paths.Count; i++)
+        bool fromSource = false;
+        var sourcePos = argslist.IndexOf("-s");
+        if (sourcePos < 0) projectPos = argslist.IndexOf("-src");
+        if (sourcePos < 0) projectPos = argslist.IndexOf("-source");
+        if (sourcePos < 0) projectPos = argslist.IndexOf("--source");
+        if (sourcePos >= 0)
         {
-            if (paths[i] == "-twolanguage")
+            fromSource = true;
+            argslist.RemoveAt(projectPos);
+            if (sourcePos < argslist.Count && !argslist[sourcePos].StartsWith("-"))
             {
-                paths.RemoveAt(i); paths.RemoveAt(i); paths.RemoveAt(i); i--;
-            }
-            else if (paths[i] == "-ln" || paths[i] == "-replace" || paths[i] == "-r")
-            {
-                paths.RemoveAt(i); paths.RemoveAt(i); i--;
-            }
-            else if (paths[i].StartsWith('-'))
-            {
-                paths.RemoveAt(i); i--;
+                sourcePath = argslist[sourcePos];
+                argslist.RemoveAt(projectPos);
             }
         }
-        string path;
-        if (paths.Count == 0)
+        var outPos = argslist.IndexOf("-o");
+        if (outPos < 0) outPos = argslist.IndexOf("-out");
+        if (outPos < 0) outPos = argslist.IndexOf("--out");
+        if (outPos >= 0 && outPos < argslist.Count-1)
         {
-            path = Directory.GetCurrentDirectory();
-            await ProcessPath(path);
-        }
-        else
-        {
-            path = paths[0];
-            if (Directory.Exists(path))
-            {
-                await ProcessPath(path);
-            }
-            else if (File.Exists(path)) Create.ProcessFileAsync(path).Wait();
+            argslist.RemoveAt(outPos);
+            outputPath = args[outPos];
+            argslist.RemoveAt(outPos);
         }
 
+        string? language;
+        var lnpos = argslist.IndexOf("-ln");
+        if (lnpos < 0) lnpos = argslist.IndexOf("--language");
+        if (lnpos >= 0 && lnpos < argslist.Count - 1) {
+            language = argslist[lnpos];
+            argslist.RemoveAt(lnpos);
+        } else language = "default";
+
+        string? replace = null;
+        var replacepos = argslist.IndexOf("-replace");
+        if (replacepos < 0) replacepos = argslist.IndexOf("-r");
+        if (replacepos < 0) replacepos = argslist.IndexOf("--replace");
+        if (replacepos >= 0 && replacepos < argslist.Count - 1) {
+            argslist.RemoveAt(replacepos);
+            replace = argslist[replacepos];
+            argslist.RemoveAt(replacepos);
+        }
+
+        string? left = null, right = null;
+        bool twolang = false;
+        var twolangpos = argslist.IndexOf("-twolanguage");
+        if (twolangpos < 0) twolangpos = argslist.IndexOf("--twolanguage");
+        if (twolangpos >= 0 && twolangpos + 2 < argslist.Count)
+        {
+            argslist.RemoveAt(twolangpos);
+            left = args[twolangpos];
+            argslist.RemoveAt(twolangpos);
+            right = args[twolangpos];
+            argslist.RemoveAt(twolangpos);
+            twolang = true;
+        }
+
+        var lowercaseFirstWords = argslist.Contains("-plc") || argslist.Contains("--plc") || argslist.Contains("--lowercase-first-words");
+        var eachVerseOnNewLine = !argslist.Contains("-cp") && !argslist.Contains("--cp") && !argslist.Contains("--each-verse-on-newline");
+        var importStrongs = argslist.Contains("-strongs") || argslist.Contains("--strongs");
+
+        argslist = argslist.Where(arg => !arg.StartsWith("-")).ToList();
+        while (argslist.Count > 0)
+        {
+            if (projectPath == null)
+            {
+                projectPath = argslist[0];
+                argslist.RemoveAt(0);
+            }
+            else if (sourcePath == null)
+            {
+                sourcePath = argslist[0];
+                argslist.RemoveAt(0);
+            }
+            else if (outputPath == null)
+            {
+                outputPath = argslist[0];
+                argslist.RemoveAt(0);
+            }
+            else break;
+        }
+
+        if (Directory.Exists(projectPath))
+        {
+            Transform = new Transform(projectPath, sourcePath, outputPath);
+            Transform.FromSource = fromSource;
+            Transform.EachVerseOnNewLine = eachVerseOnNewLine;
+            Transform.Language = language;
+            Transform.ImportStrongs = importStrongs;
+            Transform.LeftLanguage = left;
+            Transform.RightLanguage = right;
+            Transform.LowercaseFirstWords = lowercaseFirstWords;
+            Transform.Replace = replace;
+            Transform.TwoLanguage = twolang;
+            if (twolang)
+            {
+                await Transform.TransformTwoLanguagesAsync(left, right);
+            } else {
+                await Transform.TransformAsync();
+            }
+        }
+        else if (File.Exists(projectPath)) {
+            Transform = new Transform(projectPath, sourcePath, outputPath);
+            Transform.FromSource = fromSource;
+            Transform.EachVerseOnNewLine = eachVerseOnNewLine;
+            Transform.Language = language;
+            Transform.ImportStrongs = importStrongs;
+            Transform.LeftLanguage = left;
+            Transform.RightLanguage = right;
+            Transform.LowercaseFirstWords = lowercaseFirstWords;
+            Transform.Replace = replace;
+            Transform.TwoLanguage = twolang;
+            await Transform.Create.TransformFileAsync(projectPath);
+        }
     }
 }

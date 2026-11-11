@@ -17,17 +17,21 @@ using static System.Net.Mime.MediaTypeNames;
 
 namespace BibleMarkdown;
 
-public class Creator
+[Flags]
+public enum Outputs { Pandoc = 1, Html = 2, TeX = 4, Epub = 8, USFM = 0x10, OSIS = 0x20, Sword = 0x40, All = 0xFFFF, None = 0 };
+
+public class Creator: WithTransform
 {
+    public Creator(Transform transform): base(transform) { }
     public Outputs Output { get; set; } = Outputs.All;
-    public virtual Outline Outline { get; set; } = new Outline();
-    public virtual Action<string> Log { get; set; } = Program.Log;
-    public virtual BookList Books { get; set; } = new BookList();
-    public virtual string? Language { get; set; }
+    Outline? outline;
+    public Outline Outline => outline ??= new Outline(Transform); 
     public string LanguageCode
     {
         get
         {
+            if (Language == null || Language == "default") return "en";
+
             var language = Regex.Replace(Language, "[0-9]", "");
             var culture = CultureInfo
                 .GetCultures(CultureTypes.NeutralCultures)
@@ -36,15 +40,11 @@ public class Creator
             return culture?.Name ?? "en";
         }
     }
-
-
     public string SwordVersification { get; set; } = "KJV";
-    public virtual bool TwoLanguage { get; set; } = false;
+    public bool TwoLanguage { get; set; } = false;
 
-    public Epub Epub
-    {
-        get => field ??= new Epub(this);
-    }
+    Epub? epub;
+    public Epub Epub => epub ??= new Epub(Transform);
     public string? RightLanguage
     {
         get => field;
@@ -70,29 +70,10 @@ public class Creator
         }
     }
 
-    public Func<string, string> Preprocess = s => s;
-    public string? Replace = null;
-    public virtual string FootnoteLabel(int n) => Importer.FootnoteLabel(n);
-    public DateTime BibmarkTime => Program.BibmarkTime;
-    public void LogFile(string file)
-    {
-        LogFile(file, "Created");
-    }
-    public void LogFile(string file, string label)
-    {
-        var current = Directory.GetCurrentDirectory();
-        if (file.StartsWith(current))
-        {
-            file = file.Substring(current.Length);
-        }
-        Log($"{label} {file}");
-    }
-    public void ReadOutline(string path)
-    {
-        Outline = Importer.ReadOutlines(path);
-    }
-
-    public static bool IsNewer(string file, string srcfile) => Program.IsNewer(file, srcfile);
+    public Func<string, string> Preprocess { get; set; } = s => s;
+    public string? Replace { get; set; }
+    public DateTime BibmarkTime => Transform.BibmarkTime;
+    public bool IsNewer(string file, string srcfile) => Transform.IsNewer(file, srcfile);
 
     public string CleanStrongs(string text)
     {
@@ -132,9 +113,6 @@ public class Creator
         });
     }
 
-
-    public string ApplyOutline(string src, string file, Outline? items) => Importer.ApplyOutline(src, file, items, Books, Log, FootnoteLabel);
-
     public void ToPandoc(string file, string panfile)
     {
         if ((Output & (Outputs.Pandoc | Outputs.USFM | Outputs.TeX | Outputs.Epub | Outputs.Html)) == Outputs.None ||
@@ -142,8 +120,8 @@ public class Creator
 
         var text = File.ReadAllText(file);
 
-        text = ApplyOutline(text, file, Outline);
-
+        text = Outline.Apply(text, file);
+        
         string? bookname = Books.Name(file);
         int bookno = Books.Number(file);
 
@@ -475,11 +453,15 @@ public class Creator
         return name.Replace(' ', '-').Replace('.', '-');
     }
 
-    public void ToTwoLanguage(string path, string path1, string path2)
+    public void ToTwoLanguage(string leftpath, string rightpath)
     {
+        var path = ProjectPath;
 
         Log("Create Two Langauge...");
-        var leftfiles = Directory.EnumerateFiles(path1, "*.md")
+        
+        Books.Load();
+
+        var leftfiles = Directory.EnumerateFiles(leftpath, "*.md")
             .Select(file => new
             {
                 Name = Books.Name(file),
@@ -492,7 +474,7 @@ public class Creator
             .OrderBy(book => book.Number)
             .ToArray();
 
-        var rightfiles = Directory.EnumerateFiles(path2, "*.md")
+        var rightfiles = Directory.EnumerateFiles(rightpath, "*.md")
             .Select(file => new
             {
                 Name = Books.Name(file),
@@ -548,13 +530,13 @@ public class Creator
             LogFile(newfile);
         }
     }
-    public void ToVerseStats(string path)
+    public void ToVerseStats()
     {
-        var sources = Directory.EnumerateFiles(path, "*.md")
+        var sources = Directory.EnumerateFiles(ProjectPath, "*.md")
             .Where(file => Regex.IsMatch(Path.GetFileName(file), "^([0-9][0-9])"));
         var verses = new StringBuilder();
 
-        var frames = Path.Combine(path, @"out", "verseinfo.md");
+        var frames = Path.Combine(OutputPath, "verseinfo.md");
         var frametime = DateTime.MinValue;
         if (File.Exists(frames)) frametime = File.GetLastWriteTimeUtc(frames);
 
@@ -620,19 +602,19 @@ public class Creator
         LogFile(frames);
     }
 
-    public void ToOutline(string path)
+    public void ToOutline()
     {
-        var sources = Directory.EnumerateFiles(path, "*.md")
+        var sources = Directory.EnumerateFiles(ProjectPath, "*.md")
             .Where(file => Regex.IsMatch(Path.GetFileName(file), @"^([0-9][0-9])(?!.*?\.outline\.md)"));
         var verses = new StringBuilder();
 
-        var framesfile = Path.Combine(path, "out", "outline.md");
+        var framesfile = Path.Combine(OutputPath, "outline.md");
         var frametime = DateTime.MinValue;
         if (File.Exists(framesfile)) frametime = File.GetLastWriteTimeUtc(framesfile);
 
         if (!sources.Any() || sources.All(src => File.GetLastWriteTimeUtc(src) < frametime) && frametime > BibmarkTime) return;
 
-        var items = new Outline();
+        var items = new Outline(Transform);
 
         Books.Load(sources);
 
@@ -702,14 +684,14 @@ public class Creator
             }
         }
 
-        var append = Importer.ReadOutlines(path);
+        var append = new Outline(Transform).Read(ProjectPath);
         if (!append.Append && append.Count > 0)
         {
             items = append;
         }
         else if (append.Append && append.Count > 0)
         {
-            items = new Outline(items.Concat(append));
+            items = new Outline(Transform, items.Concat(append));
             items.Sort();
         }
         items.Save(framesfile);
@@ -769,23 +751,23 @@ public class Creator
         LogFile(usfmfile);
     }
 
-    public Task ProcessFileAsync(string file)
+    public Task TransformFileAsync(string file)
     {
-        var path = Path.GetDirectoryName(file);
-        var md = Path.Combine(path, "out", "pandoc");
+        var path = ProjectPath;
+        var md = Path.Combine(OutputPath, "pandoc");
         var mdtex = Path.Combine(md, "tex");
         var mdepub = Path.Combine(md, "epub");
         var mdusfm = Path.Combine(md, "usfm");
-        var tex = Path.Combine(path, "out", "tex");
-        var html = Path.Combine(path, "out", "html");
-        var usfm = Path.Combine(path, "out", "usfm");
-        if (!Directory.Exists(md)) Directory.CreateDirectory(md);
-        if (!Directory.Exists(mdtex)) Directory.CreateDirectory(mdtex);
-        if (!Directory.Exists(mdepub)) Directory.CreateDirectory(mdepub);
-        if (!Directory.Exists(mdusfm)) Directory.CreateDirectory(mdusfm);
-        if (!Directory.Exists(tex)) Directory.CreateDirectory(tex);
-        if (!Directory.Exists(html)) Directory.CreateDirectory(html);
-        if (!Directory.Exists(usfm)) Directory.CreateDirectory(usfm);
+        var tex = Path.Combine(OutputPath, "tex");
+        var html = Path.Combine(OutputPath, "html");
+        var usfm = Path.Combine(OutputPath, "usfm");
+        Directory.CreateDirectory(md);
+        Directory.CreateDirectory(mdtex);
+        Directory.CreateDirectory(mdepub);
+        Directory.CreateDirectory(mdusfm);
+        Directory.CreateDirectory(tex);
+        Directory.CreateDirectory(html);
+        Directory.CreateDirectory(usfm);
         var mdfile = Path.Combine(md, Path.GetFileName(file));
         var texfile = Path.Combine(tex, Path.GetFileNameWithoutExtension(file) + ".tex");
         var htmlfile = Path.Combine(html, Path.GetFileNameWithoutExtension(file) + ".html");
@@ -795,25 +777,27 @@ public class Creator
 
         ToPandoc(file, mdfile);
         var tasks = new[] { ToTeXAsync(mdfile, texfile), ToHtmlAsync(mdfile, htmlfile) };
-        Epub.ToEpub(path, mdfile, epubfile);
+        Epub.ToEpub(mdfile, epubfile);
         ToUSFM(mdfile, usfmfile);
         return Task.WhenAll(tasks);
     }
 
-    public async Task ToAllAsync(string path)
+    public async Task ToAllAsync()
     {
-        ReadOutline(path);
-        var files = Directory.EnumerateFiles(path, "*.md")
+        Books.Load();
+
+        Outline.Read(ProjectPath);
+        var files = Directory.EnumerateFiles(OutputPath, "*.md")
             .Where(file => Regex.IsMatch(Path.GetFileName(file), @"^[0-9.]+-.*?(?!outline.md$|map.md$)"));
         if (files.Any())
         {
-            ToOutline(path);
-            ToVerseStats(path);
-            var osisFile = Path.Combine(path, "out", "osis", $"{Path.GetFileName(path)}.xml");
+            ToOutline();
+            ToVerseStats();
+            var osisFile = Path.Combine(OutputPath, "osis", $"{Path.GetFileName(ProjectPath)}.xml");
             ToOSIS(files, osisFile);
-            await ToSWORDAsync(osisFile, Path.Combine(path, "out", "sword", "modules", "texts", "ztext", Path.GetFileName(path)));
+            await ToSWORDAsync(osisFile, Path.Combine(OutputPath, "out", "sword", "modules", "texts", "ztext", Path.GetFileName(OutputPath)));
             Log("Convert to Pandoc...");
-            await Task.WhenAll(files.AsParallel().Select(file => ProcessFileAsync(file)));
+            await Task.WhenAll(files.AsParallel().Select(file => TransformFileAsync(file)));
         }
 
     }

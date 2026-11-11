@@ -8,8 +8,9 @@ using System.Threading.Tasks;
 
 namespace BibleMarkdown;
 
-public class Epub
+public class Epub: WithTransform
 {
+	public Epub(Transform transform) : base(transform) { }
 	public bool CreateChapterLinks = true;
 	public bool Links = true;
 	public string TableOfContentsPage = "ch001.xhtml";
@@ -17,17 +18,10 @@ public class Epub
 	public bool OmitParagraphs = true;
 	public bool OmitFootnotes = true;
 	public Func<int, string> Page = book => $"ch{book:d3}.xhtml";
-
-	public Creator Create { get; private set; }
-	public Epub(Creator creator) { Create = creator; }
-
-	public bool IsNewer(string file, string srcfile) => Creator.IsNewer(file, srcfile);
     public string Id(string name) =>name.Replace(' ', '-').Replace('.', '-');
-	public string Language => Create.Language;
-	public bool TwoLanguage => Create.TwoLanguage;
-	public void LogFile(string file) => Create.LogFile(file);
-	public BookList Books => Create.Books;
-	public void ToEpub(string path, string mdfile, string epubfile)
+	public bool IsNewer(string file, string srcfile) => Transform.IsNewer(file, srcfile);
+	public bool TwoLanguage => Transform.TwoLanguage;
+    public void ToEpub(string mdfile, string epubfile)
 	{
 		if (IsNewer(epubfile, mdfile) || TwoLanguage) return;
 

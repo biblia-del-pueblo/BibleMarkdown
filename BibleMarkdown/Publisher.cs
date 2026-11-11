@@ -13,8 +13,10 @@ namespace BibleMarkdown;
 /// install without downloading it. What the Bibles were converted to (their <c>out</c> folder: PDF, EPUB, HTML ...) is
 /// published too, for people to download.
 /// </summary>
-public class Publisher
+public class Publisher: WithTransform
 {
+    public Publisher(Transform transform): base(transform) { }
+
     /// <summary>The name of the file that lists the published Bibles, next to their zips.</summary>
     public const string IndexFileName = "index.json";
 
@@ -33,10 +35,8 @@ public class Publisher
     /// <summary>The folders of an out folder that are not published at all.</summary>
     public static readonly string[] SkippedOutFolders = { "pandoc" };
 
-    public virtual Action<string> Log { get; set; } = Program.Log;
-
     /// <summary>
-    /// Publishes the Bibles, the folders in <paramref name="biblesPath"/>, into <paramref name="toWwwPath"/>:
+    /// Publishes the Bibles, the folders in SourcePath, into OutputPath:
     /// <list type="bullet">
     /// <item><c>books/Folder.zip</c>: the files that are directly in the folder of the Bible, not those of its subfolders
     /// (the sources in <c>src</c> are not published), and <c>books/index.json</c>, an array with an entry for every zip:
@@ -48,19 +48,19 @@ public class Publisher
     /// of such a folder. The <c>out/pandoc</c> folder is left out.</item>
     /// </list>
     /// A folder without books (files such as 01-Genesis.md) is skipped. What was published before for a Bible is replaced.
-    /// Every folder of <paramref name="toWwwPath"/>, <c>books</c> and <c>out</c> also gets an index.html that lists its content.
+    /// Every folder of OutputPath, <c>books</c> and <c>out</c> also gets an index.html that lists its content.
     /// </summary>
     /// <returns>The names of the zips of the Bibles, in the order of the index.</returns>
-    public List<string> Publish(string biblesPath, string toWwwPath)
+    public List<string> Bibles()
     {
-        if (!Directory.Exists(biblesPath)) throw new DirectoryNotFoundException($"Directory not found: {biblesPath}");
-        var booksPath = Path.Combine(toWwwPath, BooksFolder);
-        var outPath = Path.Combine(toWwwPath, OutFolder);
+        if (!Directory.Exists(SourcePath)) throw new DirectoryNotFoundException($"Directory not found: {SourcePath}");
+        var booksPath = Path.Combine(OutputPath, BooksFolder);
+        var outPath = Path.Combine(OutputPath, OutFolder);
         Directory.CreateDirectory(booksPath);
 
         var index = new JArray();
         var names = new List<string>();
-        foreach (var folder in Directory.EnumerateDirectories(biblesPath).OrderBy(f => f, StringComparer.OrdinalIgnoreCase))
+        foreach (var folder in Directory.EnumerateDirectories(SourcePath).OrderBy(f => f, StringComparer.OrdinalIgnoreCase))
         {
             var files = Directory.EnumerateFiles(folder).OrderBy(f => f, StringComparer.OrdinalIgnoreCase).ToList();
             // Only a folder with books is a Bible the reader can read (01-Genesis.md ...); a folder with just a scan
@@ -85,7 +85,7 @@ public class Publisher
             index.ToString(Formatting.Indented), new UTF8Encoding(false));
         Log($"Created {BooksFolder}/{IndexFileName}, {names.Count} Bibles");
 
-        WriteListings(toWwwPath);
+        WriteListings(OutputPath);
         return names;
     }
 

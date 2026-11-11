@@ -4,24 +4,244 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using System.Xml.Serialization;
-using static BibleMarkdown.Program;
-using static System.Reflection.Metadata.BlobBuilder;
 
 namespace BibleMarkdown;
 
 public class  Outline: List<OutlineItem>
 {
-    public BookList Books => Program.Books;
-    public string Language => Program.Language;
-    public void LogFile(string filename) => Program.LogFile(filename);
-
-    public bool Append { get; set; } = false;
-
-    public Outline() { }
-    public Outline(IEnumerable<OutlineItem> items): this()
+    public Transform Transform { get; private set; }
+    public BookList Books
     {
-        Clear();
+        get => Transform.Books;
+        set => Transform.Books = value;
+    }
+    public string Language => Transform.Language;
+    public bool Append { get; set; } = false;
+    public bool ParagraphVerses => Transform.ParagraphVerses;
+    public ISimpleLogger Logger => Transform.Logger;
+    public void Log(string message) => Logger.Log(message);
+    public void LogFile(string file) => Logger.LogFile(file);
+    public void LogFile(string file, string label) => Logger.LogFile(file, label);
+    public string FootnoteLabel(int i) => Transform.FootnoteLabel(i);
+
+    public Outline(Transform transform) { Transform = transform; }
+
+    public Outline(Transform transform, IEnumerable<OutlineItem> items): this(transform)
+    {
         AddRange(items);
+    }
+
+    public Outline Read(string path)
+    {
+        Outline items = new Outline(Transform);
+
+        var files = Directory.EnumerateFiles(path, "*.md")
+            .Where(file => file.EndsWith("outline.md", StringComparison.OrdinalIgnoreCase))
+            .Concat(Directory.EnumerateFiles(path, "*.xml")
+            .Where(file => file.EndsWith("outline.xml", StringComparison.OrdinalIgnoreCase)))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var file in files.ToList())
+        {
+            if (file.EndsWith(".xml") && files.Contains(Path.ChangeExtension(file, ".md"))) files.Remove(file);
+        }
+
+        foreach (var file in files)
+        {
+            if (file.EndsWith(".md")) items.AddMdOutline(file);
+            else if (file.EndsWith(".xml")) items.AddXmlOutline(file);
+        }
+
+        items.Sort();
+
+        // remove ParagraphItems that are duplicate of a TitleItem and remove duplicate BookItems and ChapterItems
+        var temp = items;
+        items = new Outline(Transform);
+        items.Append = temp.Append;
+        List<OutlineItem> sameLocation = new List<OutlineItem>(10);
+        for (int i = 0; i < temp.Count;)
+        {
+            int j = i + 1;
+            sameLocation.Add(temp[i]);
+            while (j < temp.Count && Location.Compare(temp[i].Location, temp[j].Location) == 0)
+            {
+                sameLocation.Add(temp[j++]);
+            }
+            i = j;
+            IEnumerable<OutlineItem> toAdd;
+            if (sameLocation.Any(x => x is TitleItem)) toAdd = sameLocation.Where(x => !(x is ParagraphItem));
+            else toAdd = sameLocation;
+            if (toAdd.OfType<BookItem>().Count() > 1) toAdd = toAdd
+                    .Where(x => !(x is BookItem))
+                    .Concat(
+                        toAdd.OfType<BookItem>()
+                            .Take(1)
+                    );
+            if (toAdd.OfType<ChapterItem>().Count() > 1) toAdd = toAdd
+                    .Where(x => !(x is ChapterItem))
+                    .Concat(
+                        toAdd.OfType<ChapterItem>()
+                            .Take(1)
+                    );
+            items.AddRange(toAdd);
+            sameLocation.Clear();
+        }
+
+        BookItem? bookItem = null;
+        // set BookItem items collection
+        foreach (var item in items)
+        {
+            if (item is BookItem)
+            {
+                bookItem = (BookItem)item;
+                bookItem.Items.Clear();
+            }
+            else if (bookItem != null && item.Location.Book.Number == bookItem.Location.Book.Number) bookItem.Items.Add(item);
+        }
+
+        return items;
+    }
+    public string Apply(string srctext, string filename)
+    {
+        if (Count == 0) return srctext;
+
+        var srcname = Path.GetFileName(filename);
+        string bookname = Books.Name(srcname);
+
+        var bookItem =this
+            .OfType<BookItem>()
+            .FirstOrDefault(b => b.File == srcname);
+        if (bookItem == null)
+        {
+            Log($"Book for {Regex.Replace(srcname, @"(^[0-9]{2}(\.[0-9]+)?-)|(.md$)", "")} not found in outline.md");
+            return srctext;
+            //continue; // use when loop with foreach for sequential loop for debugging
+        }
+        // remove current outline
+
+        bool replaced = true;
+        if (!Append && this.OfType<FootnoteItem>().Any())
+        {
+            // remove bibmark footnotes.
+            while (replaced)
+            {
+                replaced = false;
+                srctext = Regex.Replace(srctext, @"\^(?<mark>[a-zA-Z]+)\^(?!\[)(?<text>.*?)(?:\^\k<mark>(?<footnote>\^\[(?>\[(?<c>)|[^\[\]]+|\](?<-c>))*(?(c)(?!))\]))[ \t]*\r?\n?", m =>
+                {
+                    replaced = true;
+                    return $"{m.Groups["footnote"].Value}{m.Groups["text"].Value}";
+                }, RegexOptions.Singleline);
+            }
+        }
+        if (!Append && this.OfType<ParagraphItem>().Any())
+        {
+            srctext = Regex.Replace(srctext, @"(\r?\n|^)[ \t]*\r?\n(?![ \t]*#)", "", RegexOptions.Singleline); // remove blank line
+        }
+        //src = Regex.Replace(src, @"(?<!(^|\n)#.*?)\r?\n(?![ \t]*#)", " ", RegexOptions.Singleline);
+        srctext = Regex.Replace(srctext, "  +", " "); // remove multiple spaces.
+
+
+        if (!Append && this.OfType<TitleItem>().Any())
+        {
+            srctext = Regex.Replace(srctext, @"(?<=^|\n)##+.*?\r?\n", "", RegexOptions.Singleline); // remove titles
+        }
+        // src = Regex.Replace(src, @"(\s*\^[a-zA-Z]+\^)|(([ \t]*\^[a-zA-Z]+\^\[[^\]]*\])+([ \t]*\r?\n)?)", "", RegexOptions.Singleline); // remove footnotes
+        srctext = Regex.Replace(srctext, @"//!verse-paragraphs.*?(\r?\n|$)", "", RegexOptions.Singleline); // remove verse paragraphs
+
+        if (bookItem.VerseParagraphs) srctext = $"//!verse-paragraphs{Environment.NewLine}{srctext}";
+
+        var frames = bookItem.Items.GetEnumerator();
+        //var book = Books["default", bookname];
+        OutlineItem? frame = frames.MoveNext() ? frames.Current : null;
+        int chapter = 0;
+        int verse = -1;
+
+        srctext = Regex.Replace(srctext, @"(?<=^|\n)#[ \t]+(?<chapter>[0-9]+)(\s*\r?\n|$)|\^(?<verse>[0-9]+)\^.*?(?=\s*\^[0-9]+\^|\s*@[0-9]+|\s*#|\s*$)|@(?<verse2>[0-9]+).*?(?=\s*\^[0-9]+\^|\s*@[0-9]+|\s*#|\s*$)|(?<=(^|\n)#[ \t]+[0-9]+[ \t]*\r?\n(##[ \t]+.*?\r?\n)?)(?<empty>.*?)(?=\s*\\?\s*\^1\^|\s*\\?\s*@1|\s*#|\s*$)", m =>
+        // empty is special text at the beginning of a psalm without verse number
+        {
+            var txt = m.Value;
+
+            if (m.Groups["chapter"].Success) // chapter
+            {
+                int.TryParse(m.Groups["chapter"].Value, out chapter); verse = -1;
+            }
+            else if (m.Groups["verse"].Success) // verse
+            {
+                int.TryParse(m.Groups["verse"].Value, out verse);
+            }
+            else if (m.Groups["verse2"].Success) // verse
+            {
+                int.TryParse(m.Groups["verse2"].Value, out verse);
+            }
+            else if (m.Groups["empty"].Success) //introduction line of a psalm
+            {
+                verse = 0;
+            }
+
+            while (frame != null && frame.Chapter <= chapter && frame.Verse <= verse)
+            {
+
+                if (frame is TitleItem)
+                {
+                    if (Regex.IsMatch(txt, "^#"))
+                    {
+                        txt = $"{txt}## {((TitleItem)frame).Title}{Environment.NewLine}"; // insert title after a chapter title
+                    }
+                    // insert title after a verse
+                    else txt = $"{txt}{Environment.NewLine}{Environment.NewLine}## {((TitleItem)frame).Title}{Environment.NewLine}";
+                }
+                else if (frame is FootnoteItem)
+                {
+                    txt = $"{txt} {((FootnoteItem)frame).Footnote}";
+                }
+                else if (frame is ParagraphItem)
+                {
+                    txt = $"{txt}{Environment.NewLine}{Environment.NewLine}";
+                }
+
+                frame = frames.MoveNext() ? frames.Current : null;
+            }
+
+            return txt;
+        }, RegexOptions.Singleline);
+
+        // remove whitespace before a verse on a new line
+        srctext = Regex.Replace(srctext, @"(?<=(^|\n))[ \t]+(\^[0-9]+\^|@[0-9]+)", "$2", RegexOptions.Singleline);
+
+        // hack because of bad output
+        // remove empty lines after ## title
+        srctext = Regex.Replace(srctext, @"(?<=(^|\n)##[^\r\n]*?\r?\n)([ \t]*\r?\n)+", "", RegexOptions.Singleline);
+        // remove multiple emtpy lines
+        srctext = Regex.Replace(srctext, @"(?<=(^|\n))([ \t]*\r?\n)+[ \t]*(?=\r?\n)", "", RegexOptions.Singleline);
+
+        // remove bibmark footnotes
+        /* replaced = true;
+        while (replaced)
+        {
+            replaced = false;
+            src = Regex.Replace(src, @"\^(?<mark>[a-zA-Z]+)\^(?!\[)(?<text>.*?)(?:\^\k<mark>(?<footnote>\^\[(?>\[(?<c>)|[^\[\]]+|\](?<-c>))*(?(c)(?!))\]))[ \t]*\r?\n?", m =>
+            {
+                replaced = true;
+                return $"{m.Groups["footnote"].Value}{m.Groups["text"].Value}";
+            }, RegexOptions.Singleline);
+        } */
+
+        // apply bibmark footnotes
+        replaced = true;
+        int markno = 1;
+        while (replaced)
+        {
+            replaced = false;
+            srctext = Regex.Replace(srctext, @"(?<!\^[a-zA-Z]+)\^\[(?<footnote>(?>\[(?<c>)|[^\[\]]+|\](?<-c>))*(?(c)(?!)))\](?<text>.*?)(?=\r?\n[ \t]*\r?\n)", m =>
+            {
+                replaced = true;
+                string space;
+                if (markno == 1) space = "\r\n"; else space = " ";
+                return $"^{FootnoteLabel(markno)}^{m.Groups["text"].Value}{space}^{FootnoteLabel(markno)}^[{m.Groups["footnote"].Value}]";
+            }, RegexOptions.Singleline);
+            markno++;
+        }
+
+        return srctext;
     }
 
     public void AddMdOutline(string filename)
@@ -32,25 +252,30 @@ public class  Outline: List<OutlineItem>
         frame = Regex.Replace(frame, "//(?!!).*?\\r?\\n", "", RegexOptions.Singleline); // remove // comments
 
         // Load versification map
-        VerseMaps? Map = null;
+        VerseMaps? Map = null, FootnotesMap = null;
         var mapVerses = Regex.Match(frame, @"(//|/\*)!map\s*(?<map>\.*?)($|\*/|\r?\n)", RegexOptions.Singleline);
         var map = mapVerses.Success ?
-            mapVerses.Groups["map"].Success ? 
-                mapVerses.Groups["map"].Value.Trim() : 
+            mapVerses.Groups["map"].Success ?
+                mapVerses.Groups["map"].Value.Trim() :
                 "" :
                 null;
-        if (map == "") map = Path.ChangeExtension(filename, ".map.md");
-         var mapfile = $"{map}.map.md";
+        string mapfile;
+        if (map == "") mapfile = map = Path.ChangeExtension(filename, ".map.md");
+        else mapfile = $"{map}.map.md";
+        var footnoteMapFile = Path.Combine(Path.GetDirectoryName(filename), "footnotes.map.md");
 
         Append |= Regex.IsMatch(frame, @"(//|/\*)!append\.*?($|\*/|\r?\n)", RegexOptions.Singleline);
 
         if (Regex.IsMatch(mapfile, @"^(?!/|[A-Z]:\\)")) mapfile = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(mapfile), mapfile));
         if (File.Exists(mapfile))
         {
-            Map = new VerseMaps().Import(mapfile);
+            Map = new VerseMaps(Transform).Import(mapfile);
         }
-
-        var books = Regex.Matches(frame, @"(^|\n)#\s+(?<book>.*?)[ \t]*\r?\n(?<bookbody>.*?)(?=[ \t\r\n]*\r?\n#\s|$)", RegexOptions.Singleline)
+        if (File.Exists(footnoteMapFile))
+        {
+            FootnotesMap = new VerseMaps(Transform).Import(footnoteMapFile);
+        }
+    var books = Regex.Matches(frame, @"(^|\n)#\s+(?<book>.*?)[ \t]*\r?\n(?<bookbody>.*?)(?=[ \t\r\n]*\r?\n#\s|$)", RegexOptions.Singleline)
             .Select(match => new
             {
                 Name = Books.Name(match.Groups["book"].Value),
@@ -129,7 +354,7 @@ public class  Outline: List<OutlineItem>
                             break;
                         case OutlineItemClass.Footnote:
                             var footnoteItem = new FootnoteItem(book.Book, token.Footnote, chapterItem.Chapter, token.Verse);
-                            MapItem(Map, footnoteItem);
+                            MapItem(Map, footnoteItem, FootnotesMap);
                             Add(footnoteItem);
                             bookItem.Items.Add(footnoteItem);
                             break;
@@ -161,7 +386,7 @@ public class  Outline: List<OutlineItem>
             if (Regex.IsMatch(mapfile, @"^(?!/|[A-Z]:\\)")) mapfile = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(mapfile), mapfile));
             if (File.Exists(mapfile))
             {
-                Map = new VerseMaps().Import(mapfile);
+                Map = new VerseMaps(Transform).Import(mapfile);
             }
         }
 
@@ -231,13 +456,15 @@ public class  Outline: List<OutlineItem>
         }
     }
 
-    public OutlineItem MapItem(VerseMaps map, OutlineItem item)
+    public OutlineItem MapItem(VerseMaps map, OutlineItem item, VerseMaps footnotesMap = null)
     {
         if (map != null && (item is TitleItem || item is ParagraphItem || item is FootnoteItem))
         {
             item.Location = map.Map(item.Location);
             if (item is FootnoteItem footnote)
             {
+                if (footnotesMap == null) throw new NotSupportedException("You need to specify footnotesMap");
+
                 // map footnote references
                 var books = Books[Language]
                     .Select(book => Regex.Escape(book.Value.Abbreviation))
@@ -257,7 +484,7 @@ public class  Outline: List<OutlineItem>
                         Chapter = chapter,
                         Verse = verse
                     };
-                    location = VerseMaps.Footnotes.Map(location);
+                    location = footnotesMap.Map(location);
                     if (upto != -1)
                     {
                         uptolocation = new Location()
@@ -266,7 +493,7 @@ public class  Outline: List<OutlineItem>
                             Chapter = chapter,
                             Verse = upto
                         };
-                        uptolocation = VerseMaps.Footnotes.Map(uptolocation);
+                        uptolocation = footnotesMap.Map(uptolocation);
                         if (uptolocation.Chapter != location.Chapter || uptolocation.Verse <= location.Verse) uptolocation = null;
                     }
 
@@ -392,7 +619,7 @@ public class  Outline: List<OutlineItem>
             else if (item is TitleItem)
             {
                 var titleItem = (TitleItem)item;
-                if (Location.Compare(lastlocation, item.Location) != 0) result.AppendLine(Program.ParagraphVerses ? $"@{item.Verse}" : $"^{item.Verse}^");
+                if (Location.Compare(lastlocation, item.Location) != 0) result.AppendLine(ParagraphVerses ? $"@{item.Verse}" : $"^{item.Verse}^");
                 var title = new XElement("Title");
                 title.Value = titleItem.Title.Trim();
                 title.Add(new XAttribute("Verse", item.Verse));
@@ -403,7 +630,7 @@ public class  Outline: List<OutlineItem>
             else if (item is FootnoteItem)
             {
                 var footnoteItem = (FootnoteItem)item;
-                if (Location.Compare(lastlocation, item.Location) != 0) result.Append(Program.ParagraphVerses ? $"@{item.Verse} " : $"^{item.Verse}^ ");
+                if (Location.Compare(lastlocation, item.Location) != 0) result.Append(ParagraphVerses ? $"@{item.Verse} " : $"^{item.Verse}^ ");
                 var footnote = new XElement("Footnote");
                 footnote.Value = footnoteItem.Footnote;
                 footnote.Add(new XAttribute("Verse", item.Verse));
@@ -413,7 +640,7 @@ public class  Outline: List<OutlineItem>
             }
             else if (item is ParagraphItem)
             {
-                if (Location.Compare(lastlocation, item.Location) != 0) result.Append(Program.ParagraphVerses ? $"@{item.Verse} " : $"^{item.Verse}^ ");
+                if (Location.Compare(lastlocation, item.Location) != 0) result.Append(ParagraphVerses ? $"@{item.Verse} " : $"^{item.Verse}^ ");
                 var paragraph = new XElement("Paragraph");
                 paragraph.Add(new XAttribute("Verse", item.Verse));
                 if (chapterxml != null) chapterxml.Add(paragraph);

@@ -5,6 +5,8 @@ using System.Text;
 using System.Xml.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using System.Security.AccessControl;
 
 namespace BibleMarkdown;
 
@@ -16,11 +18,22 @@ public class Book
 	public int Number;
 }
 
-public class BookList : SortedList<string, SortedList<string, Book>>
+public class BookList : SortedList<string?, SortedList<string?, Book>>
 {
-	public static string Language => Program.Language;
+	Transform Transform { get; set; }
+	public BookList(Transform transform) {
+		Transform = transform;
+		Add(null, new SortedList<string?, Book>());
+		Add("default", new SortedList<string?, Book>());
+    }
+	string? Language
+	{
+		get => Transform.Language;
+		set => Transform.Language = value;
+	}
+	void Log(string message) => Transform.Log(message); 
 
-	public Book this[string language, int number]
+    public Book this[string? language, int number]
 	{
 		get
 		{
@@ -29,7 +42,7 @@ public class BookList : SortedList<string, SortedList<string, Book>>
 				.Value;
 		}
 	}
-	public Book this[string language, string bookname]
+	public Book this[string? language, string bookname]
 	{
 		get
 		{
@@ -51,13 +64,19 @@ public class BookList : SortedList<string, SortedList<string, Book>>
 		return -1;
 	}
 
-	public BookList Load(string path)
+	public BookList Load()
 	{
 		if (Count > 1) return this;
 
-		var namesfile = Path.Combine(path, "src", "booknames.xml");
+		var path = Transform.ProjectPath;
+		var namesfile = Path.Combine(path, "booknames.xml");
 
-		if (!File.Exists(namesfile)) return this;
+		if (!File.Exists(namesfile))
+		{
+            path = Transform.SourcePath;
+            namesfile = Path.Combine(path, "booknames.xml");
+			if (!File.Exists(namesfile)) return this;
+		}
 
 		XElement xml;
 		using (var file = File.Open(namesfile, FileMode.Open, FileAccess.Read))
@@ -65,9 +84,9 @@ public class BookList : SortedList<string, SortedList<string, Book>>
 			xml = XElement.Load(file);
 		}
 
-		Program.Log($"Importing booknames.xml.");
+		Log($"Importing booknames.xml.");
 
-		Program.Language = (string?)xml.Attribute("default") ?? Language;
+		Language = (string?)xml.Attribute("default") ?? Language;
 
 		var languages = xml
 			.Elements("ID")
@@ -113,11 +132,14 @@ public class BookList : SortedList<string, SortedList<string, Book>>
 		return this;
 	}
 
-	public IEnumerable<Book> All => Values.SelectMany(lang => lang.Values);
+    public IEnumerable<Book> All => Values.SelectMany(lang => lang.Values);
 
-	public static BookList Books = new BookList();
-
-	public static bool HasBookList => Books != null && Books.Count > 0;
+	public BookList Books
+	{
+		get => Transform.Books;
+		//set => Transform.Books = value;
+	}
+	public bool HasBookList => Books != null && Books.Count > 0;
 }
 
 public class ParallelVerse
@@ -128,6 +150,12 @@ public class ParallelVerse
 
 public class ParallelVerses : List<ParallelVerse>
 {
+	public Transform Transform { get; private set; }
+	public string? Language => Transform.Language;
+	public BookList Books => Transform.Books;
+	public ParallelVerses(Transform tranform): base() { Transform = tranform; }
+	public void Log(string message) => Transform.Log(message);
+
 	public ParallelVerses Load(string path)
 	{
 		if (Count != 0) return this;
@@ -136,9 +164,9 @@ public class ParallelVerses : List<ParallelVerse>
 
 		if (!File.Exists(linklistfile)) return this;
 
-		Program.Log("Importing linklist.xml");
+		Log("Importing linklist.xml");
 
-		BookList.Books.Load(path);
+		Books.Load();
 
 		XElement xml;
 		using (var file = File.Open(linklistfile, FileMode.Open, FileAccess.Read))
@@ -154,7 +182,7 @@ public class ParallelVerses : List<ParallelVerse>
             if (Regex.IsMatch(mapfile, @"^(?!/|[A-Z]:\\)")) mapfile = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(mapfile), mapfile));
             if (File.Exists(mapfile))
             {
-                Map = new VerseMaps().Import(mapfile);
+				Map = new VerseMaps(Transform).Import(mapfile);
             }
         }
 
@@ -163,7 +191,7 @@ public class ParallelVerses : List<ParallelVerse>
 			.Descendants("verse")
 			.Select(x =>
 			{
-				var book = BookList.Books[Program.Language, (int)x.Attribute("bn")];
+				var book = Books[Language, (int)x.Attribute("bn")];
                 return new ParallelVerse
 				{
 					Verse = mapfn(new Location
@@ -176,7 +204,7 @@ public class ParallelVerses : List<ParallelVerse>
 					ParallelVerses = x.Elements("link")
 						.Select(link =>
 						{
-							var linkbook = BookList.Books[(int)link.Attribute("bn")];
+							var linkbook = Books[(int)link.Attribute("bn")];
 							var verse = mapfn(new Location
 							{
 								Book = linkbook,
@@ -201,13 +229,11 @@ public class ParallelVerses : List<ParallelVerse>
 }
 public class VerseMaps : Dictionary<string, SortedList<Location, Location>>
 {
-	public static VerseMaps ParallelVerses = new VerseMaps();
-	public static VerseMaps Paragraphs = new VerseMaps();
-	public static VerseMaps Titles = new VerseMaps();
-	public static VerseMaps Footnotes = new VerseMaps();
-	public static VerseMaps DualLanguage = new VerseMaps();
-	public static string Test = "";
-
+	Transform Transform { get; set; }
+	BookList Books => Transform.Books;
+	string? Language => Transform.Language;
+	public VerseMaps(Transform transform) { Transform = transform; }
+	public void Log(string message) => Transform.Log(message);
 	public Location Map(Location verse)
 	{
 		if (verse.Verse < 0) verse.Verse = 1;
@@ -254,7 +280,7 @@ public class VerseMaps : Dictionary<string, SortedList<Location, Location>>
 			};
 			if (loc.Chapter != verse.Chapter || loc.Verse != verse.Verse)
 			{
-				Program.Log($"Verse mapped from {verse.Book.Name} {verse.Chapter}:{verse.Verse} to {loc.Chapter}:{loc.Verse}.");
+				Log($"Verse mapped from {verse.Book.Name} {verse.Chapter}:{verse.Verse} to {loc.Chapter}:{loc.Verse}.");
 			}
 			if (verse.UpToVerse.HasValue)
 			{
@@ -283,7 +309,6 @@ public class VerseMaps : Dictionary<string, SortedList<Location, Location>>
 		}
 	}
 
-
 	public VerseMaps? Import(string? mapfile)
 	{
 		if (mapfile == null || !File.Exists(mapfile)) return null;
@@ -299,11 +324,11 @@ public class VerseMaps : Dictionary<string, SortedList<Location, Location>>
 			});
 		foreach (var book in books)
 		{
-			var bookfromlist = BookList.Books[Program.Language].Values.FirstOrDefault(b => b.Name == book.Book);
+			var bookfromlist = Books[Language].Values.FirstOrDefault(b => b.Name == book.Book);
 
 			if (bookfromlist == null)
 			{
-				Program.Log($"Error: No book called {book.Book} booknames.xml");
+				Log($"Error: No book called {book.Book} booknames.xml");
 				continue;
 			}
 			var map = Regex.Matches(book.Map, @"([0-9]+):([0-9]+)=>([0-9]+):([0-9]+)", RegexOptions.Singleline)
@@ -362,11 +387,4 @@ public class Location: IComparable<Location>
 		return 0;
 	}
 	int IComparable<Location>.CompareTo(Location? other) => Compare(this, other);
-}
-
-public partial class Program
-{
-	public static BookList Books => BookList.Books;
-
-	public static void Init() { Books.Add("default", new SortedList<string, Book>()); }
 }

@@ -10,21 +10,32 @@ using System.Threading.Tasks;
 
 namespace BibleMarkdown;
 
-public class Pandoc
+public class Pandoc: WithTransform
 {
-	static string path;
-	public static bool IsWindows => RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows);
-	public static IEnumerable<string> Paths
+	public readonly static Version PackagedVersion = new Version("3.13"); 
+	
+	string PandocPath = "";
+	public Pandoc(Transform transform): base(transform) {
+        var arch = RuntimeInformation.ProcessArchitecture;
+        if (arch == Architecture.X86) arch = Architecture.X64;
+        var archstr = arch.ToString().ToLower();
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) SetPandocPath(@"runtimes\win\pandoc.exe");
+        else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) SetPandocPath($"rutimes/linux-{archstr}/pandoc");
+        else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) SetPandocPath($"runtimes/osx-{archstr}/pandoc");
+        else throw new PlatformNotSupportedException();
+	}
+    public static bool IsWindows => RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows);
+	IEnumerable<string> Paths
 	{
 		get
 		{
 			string proc, machine = "", user = "";
 			string[] sources;
-			proc = System.Environment.GetEnvironmentVariable("PATH");
+			proc = System.Environment.GetEnvironmentVariable("PATH") ?? "";
 			if (IsWindows)
 			{
-				machine = System.Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.Machine);
-				user = System.Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.User);
+				machine = System.Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.Machine) ?? "";
+				user = System.Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.User) ?? "";
 				sources = new string[] {
 						System.Environment.GetFolderPath(System.Environment.SpecialFolder.System),
 						System.Environment.GetFolderPath(System.Environment.SpecialFolder.SystemX86),
@@ -34,13 +45,14 @@ public class Pandoc
 
 			return sources
 				.SelectMany(paths => paths.Split(new char[] { Path.PathSeparator }, StringSplitOptions.RemoveEmptyEntries))
-				.Select(path => path.Trim())
+                .Where(path => !string.IsNullOrWhiteSpace(path))
+                .Select(path => path.Trim())
 				.Distinct();
 		}
 	}
-	public static string Find(string cmd)
+	public string? Find(string cmd)
 	{
-		string file = null;
+		string? file = null;
 		cmd = cmd.Trim('"');
 		if (cmd.IndexOf(Path.DirectorySeparatorChar) >= 0)
 		{
@@ -49,77 +61,74 @@ public class Pandoc
 		else
 		{
 			file = Paths
-				  .SelectMany(p =>
-				  {
-					  var p1 = Path.Combine(p, cmd);
-					  return new string[] { p1, Path.ChangeExtension(p1, "exe") };
-				  })
+				  .Select(p => IsWindows ? Path.Combine(p, cmd + ".exe") : Path.Combine(p,cmd))
 				  .FirstOrDefault(p => File.Exists(p));
 		}
 		return file;
 	}
 
-	public static void SetPandocPath(string exe) 
+	void SetPandocPath(string exe) 
 	{
-		path = Find("pandoc");
-		Version version;
-		if (path != null)
+		var pandocPath = Find("pandoc");
+		if (pandocPath != null)
 		{
-			var ver = Regex.Match(Version(), "[0-9\\.]+");
-			if (ver.Success && System.Version.TryParse(ver.Value, out version))
+			var version = Version;
+			if (version != null && version < PackagedVersion)
 			{
-				// if version < 3.9.0.2 use internal pandoc
-				if (version.Major < 3 || version.Major == 3 &&
-					(version.Minor < 9 || version.Minor == 9 &&
-					(version.Build < 0 || version.Build == 0 &&
-					version.Revision < 2))) {
-					path = null; // use internal pandoc
-				}
+				pandocPath = null; // use internal pandoc
 			}
 		}
-		if (path == null)
+		if (pandocPath == null)
 		{
 			var exepath = AppDomain.CurrentDomain.BaseDirectory;
-			path = Path.Combine(exepath, exe);
-			if (path.Contains("/")) Process.Start("chmod", $"+x \"{path}\"").WaitForExit();
+			pandocPath = Path.Combine(exepath, exe);
+			if (!IsWindows && PandocPath.Contains(Path.DirectorySeparatorChar)) Process.Start("chmod", $"+x \"{PandocPath}\"").WaitForExit();
 			// Set PATH to pandoc
 			var userenv = Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.User) ?? "";
-			var pandocpath = Path.GetDirectoryName(path) ?? "";
+			var pandocpath = Path.GetDirectoryName(PandocPath) ?? "";
 			var envpaths = userenv.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries);
 			if (!envpaths.Contains(pandocpath))
 			{
 				userenv = string.Join(Path.PathSeparator, envpaths.Concat(new[] { pandocpath }));
-				; Environment.SetEnvironmentVariable("PATH", userenv, EnvironmentVariableTarget.User);
+				try
+				{
+					Environment.SetEnvironmentVariable("PATH", userenv, EnvironmentVariableTarget.User);
+				}
+				catch { }
 			}
 		} else
 		{
-			Program.Log("Pandoc found in PATH");
+			Log("Pandoc found in PATH");
 		}
-		Program.Log(Version());
+		PandocPath = pandocPath;
+		//Log(Version?.ToString(3));
 	}
 
-	public static string Version()
+    public Version? Version
 	{
-		var stdOutBuffer = new StringBuilder();
-		var result = Cli.Wrap(path)
-			.WithArguments($"--version")
-			.WithStandardOutputPipe(PipeTarget.ToStringBuilder(stdOutBuffer))
-			.ExecuteAsync().Task.Result;
-		return stdOutBuffer.ToString().Split('\n').FirstOrDefault() ?? "";
+		get
+		{
+			var stdOutBuffer = new StringBuilder();
+			var result = Cli.Wrap(PandocPath)
+				.WithArguments($"--version")
+				.WithStandardOutputPipe(PipeTarget.ToStringBuilder(stdOutBuffer))
+				.ExecuteAsync().Task.Result;
+			return Version.TryParse(Regex.Match(stdOutBuffer.ToString(), "[0-9.]+").Value, out var version) ? version : null;
+		}
 	}
-	public static async Task RunAsync(string sourcefile, string destfile, string sourceformat, string destformat)
+	public async Task RunAsync(string sourcefile, string destfile, string sourceformat, string destformat)
 	{
 		var stdOutBuffer = new StringBuilder();
 		var stdErrBuffer = new StringBuilder();
 
-		var result = await Cli.Wrap(path)
+		var result = await Cli.Wrap(PandocPath)
 			.WithArguments($@"""{sourcefile}"" -o ""{destfile}"" --from {sourceformat} --to {destformat}")
 			.WithWorkingDirectory(Environment.CurrentDirectory)
 			.WithStandardOutputPipe(PipeTarget.ToStringBuilder(stdOutBuffer))
 			.WithStandardErrorPipe(PipeTarget.ToStringBuilder(stdErrBuffer))
 			.ExecuteAsync();
 
-		Program.Log(stdOutBuffer.ToString().Trim(' ', '\t', '\r', '\n'));
-		Program.Log(stdErrBuffer.ToString().Trim(' ', '\t', '\r', '\n'));
+		Log(stdOutBuffer.ToString().Trim(' ', '\t', '\r', '\n'));
+		Log(stdErrBuffer.ToString().Trim(' ', '\t', '\r', '\n'));
 	}
 }

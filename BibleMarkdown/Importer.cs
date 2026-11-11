@@ -15,75 +15,46 @@ using System.Reflection.Metadata.Ecma335;
 
 namespace BibleMarkdown;
 
-public class Importer
+public class Importer: WithTransform
 {
-    public virtual bool Imported { get; set; } = false;
-    public virtual Action<string> Log { get; set; } = Program.Log;
-    public Func<string, string>? PreprocessImportUSFM { get; set; }
+    public Importer(Transform transform) : base(transform) { }
+    public bool Imported { get; set; } = false;
+    public Func<string, string>? PreprocessImportUSFM { get; set; } = null;
     public Func<string, string>? Postprocess { get; set; } = null;
+    public bool ImportStrongs { get; set; } = true;
+    public bool EachVerseOnNewLine { get; set; } = true;
+    public bool LowercaseFirstWords { get; set; } = false;
+    public bool Disabled { get; set; } = false;
 
-    public virtual bool ImportStrongs { get; set; } = true;
-    public virtual bool EachVerseOnNewLine { get; set; } = true;
-    public virtual bool LowercaseFirstWords { get; set; } = false;
-    public virtual bool ParagraphVerses { get; set; } = false;
+    public virtual Importer All()
+    {
+        if (Disabled || !Directory.Exists(SourcePath)) return this;
 
-    public virtual BookList Books { get; set; } = new BookList();
-    public virtual string? Language { get; set; }
-    public void LogFile(string file)
-    {
-        LogFile(file, "Created");
-    }
-    public void LogFile(string file, string label)
-    {
-        var current = Directory.GetCurrentDirectory();
-        if (file.StartsWith(current))
-        {
-            file = file.Substring(current.Length);
-        }
-        Log($"{label} {file}");
-    }
+        Books.Load();
 
-    public static string FootnoteLabel(int i)
-    {
-        if (i == 0) return "a";
-        StringBuilder label = new StringBuilder();
-        while (i > 0)
-        {
-            var ch = (char)(((int)'a') + i % 26);
-            label.Append(ch);
-            i = i / 26;
-        }
-        return label.ToString();
+        return FromZip()
+        .ImportInfo()
+        .FromBibleEdit()
+        .FromUSFM()
+        .FromTXT()
+        .FromZefania()
+        .FromXmlOther()
+        .FromSWORD()
+        .FromESword()
+        .FromMySword()
+        .FromJavascripture()
+        .FromBibleMarkdown()
+        .ParallelVerses()
+        .Outline()
+        .PostprocessMarkdown()
+        .ImportInfo();
     }
 
-    public virtual void All(string mdpath, string? srcpath = null)
+    public Importer PostprocessMarkdown()
     {
-        if (srcpath == null) srcpath = Path.Combine(mdpath, "src");
+        if (Disabled || Postprocess == null) return this;
 
-        Books = new BookList().Load(mdpath);
-        FromZip(mdpath, srcpath);
-        ImportInfo(mdpath, srcpath);
-        FromBibleEdit(mdpath, srcpath);
-        FromUSFM(mdpath, srcpath);
-        FromTXT(mdpath, srcpath);
-        FromZefania(mdpath, srcpath);
-        FromXmlOther(mdpath, srcpath);
-        FromSWORD(mdpath, srcpath);
-        FromESword(mdpath, srcpath);
-        FromMySword(mdpath, srcpath);
-        FromJavascripture(mdpath, srcpath);
-        FromBibleMarkdown(mdpath, srcpath);
-        ParallelVerses(mdpath);
-        Outline(mdpath);
-        PostprocessMarkdown(mdpath);
-        ImportInfo(mdpath, srcpath);
-    }
-
-    public void PostprocessMarkdown(string mdpath)
-    {
-        if (Postprocess == null) return;
-
-        var sources = Directory.EnumerateFiles(mdpath)
+        var sources = Directory.EnumerateFiles(ProjectPath)
             .Where(file => file.EndsWith(".md", StringComparison.OrdinalIgnoreCase) &&
             Regex.IsMatch(Path.GetFileName(file), "^[0-9][0-9.]*-"));
         if (sources.Any())
@@ -97,7 +68,9 @@ public class Importer
                 File.WriteAllText(file, text);
             }
         }
+        return this;
     }
+    public int IndexSize = 0;
     /// <summary>
     /// Creates the index of all the words of the books in <paramref name="mdpath"/>: a LiteDB database
     /// (<see cref="WordIndex.FileName"/>, in the same folder) with an entry for every word of every verse, its book,
@@ -105,12 +78,14 @@ public class Importer
     /// <see cref="WordIndex.Search"/>.
     /// </summary>
     /// <returns>The number of words in the index.</returns>
-    public int CreateIndex(string mdpath)
+    public Importer CreateIndex()
     {
+        if (Disabled || !Directory.Exists(SourcePath)) return this;
+
         Log("Create the word index");
-        int count = WordIndex.Create(mdpath);
-        LogFile(Path.Combine(mdpath, WordIndex.FileName), $"Created, {count} words,");
-        return count;
+        IndexSize = WordIndex.Create(base.ProjectPath);
+        LogFile(Path.Combine(base.ProjectPath, WordIndex.FileName), $"Created, {IndexSize} words,");
+        return this;
     }
 
     /// <summary>The name of the file that stores the <see cref="InstallableBook"/> entry of a Bible, in the folder of its books.</summary>
@@ -147,37 +122,42 @@ public class Importer
     /// there is replaced.
     /// </summary>
     /// <returns>Whether there was an info.json to copy.</returns>
-    public bool ImportInfo(string mdpath, string? srcpath = null)
+    public Importer ImportInfo()
     {
-        if (srcpath == null) srcpath = Path.Combine(mdpath, "src");
-        var source = new[] { srcpath, Path.Combine(srcpath, "bibmark") }
+        if (Disabled || !Directory.Exists(SourcePath)) return this;
+
+        var source = (new[] { base.SourcePath, Path.Combine(base.SourcePath, "bibmark") })
             .Select(folder => Path.Combine(folder, InfoFileName))
             .FirstOrDefault(File.Exists);
-        if (source == null) return false;
+        if (source == null) return this;
 
-        Directory.CreateDirectory(mdpath);
-        var target = Path.Combine(mdpath, InfoFileName);
+        Directory.CreateDirectory(base.ProjectPath);
+        var target = Path.Combine(base.ProjectPath, InfoFileName);
         if (!string.Equals(Path.GetFullPath(source), Path.GetFullPath(target), StringComparison.OrdinalIgnoreCase))
             File.Copy(source, target, overwrite: true);
         LogFile(target);
-        return true;
+        return this;
     }
-    public void ImportBookNames(string mdpath, string? srcpath = null)
+    public Importer ImportBookNames()
     {
+        if (Disabled || !Directory.Exists(SourcePath)) return this;
+
         const string BooknamesFile = "booknames.xml";
-        if (srcpath == null) srcpath = Path.Combine(mdpath, "src");
-        var source = Path.Combine(srcpath, BooknamesFile);
-        Directory.CreateDirectory(mdpath);
-        if (File.Exists(source)) File.Copy(source, Path.Combine(mdpath, BooknamesFile), true);
+        var source = Path.Combine(base.SourcePath, BooknamesFile);
+        Directory.CreateDirectory(base.ProjectPath);
+        if (File.Exists(source)) File.Copy(source, Path.Combine(base.ProjectPath, BooknamesFile), true);
+        return this;
     }
 
-    public void FromBibleMarkdown(string mdpath, string? srcpath = null)
+    public Importer FromBibleMarkdown()
     {
-        if (srcpath == null) srcpath = Path.Combine(mdpath, "src");
+        if (Disabled || !Directory.Exists(base.SourcePath)) return this;
+
+        var srcpath = base.SourcePath;
         var bmpath = Path.Combine(srcpath, "bibmark");
         if (Directory.Exists(bmpath)) srcpath = bmpath;
-        if (!Directory.Exists(srcpath)) return;
-        var sources = Directory.EnumerateFiles(srcpath)
+        else if (!Directory.Exists(srcpath)) return this;
+        var sources = Directory.EnumerateFiles(SourcePath)
             .Where(file => file.EndsWith(".md", StringComparison.OrdinalIgnoreCase) ||
             file.EndsWith(".db", StringComparison.OrdinalIgnoreCase) ||
             file.EndsWith(".json", StringComparison.OrdinalIgnoreCase) ||
@@ -190,7 +170,7 @@ public class Importer
 
             foreach (var source in sources)
             {
-                var dest = Path.Combine(mdpath, Path.GetFileName(source));
+                var dest = Path.Combine(base.ProjectPath, Path.GetFileName(source));
 
                 if (source.EndsWith(".db", StringComparison.OrdinalIgnoreCase))
                 { // binary file
@@ -224,40 +204,34 @@ public class Importer
                 }
             }
         }
+
+        return this;
     }
 
-    public void FromZip(string mdpath, string? srcpath = null)
+    public Importer FromZip()
     {
-        if (srcpath == null) srcpath = Path.Combine(mdpath, "src");
-        var sources = Directory.EnumerateFiles(srcpath)
+        if (Disabled || !Directory.Exists(SourcePath)) return this;
+
+        var sources = Directory.EnumerateFiles(SourcePath)
             .Where(file => !Path.GetFileName(file).Equals("booknames.xml", StringComparison.InvariantCultureIgnoreCase))
             .ToList();
         if (sources.Count == 1 && sources[0].EndsWith(".zip", StringComparison.InvariantCultureIgnoreCase))
         {
             var zipfile = sources[0];
-            System.IO.Compression.ZipFile.ExtractToDirectory(zipfile, srcpath, true);
+            ZipFile.ExtractToDirectory(zipfile, SourcePath, true);
         }
+        return this;
     }
 
-    public void FromUSFM(string mdpath, string? srcpath = null)
+    public Importer FromUSFM()
     {
-        if (srcpath == null) srcpath = Path.Combine(mdpath, "src");
-        var sources = Directory.EnumerateFiles(srcpath)
+        if (Disabled || !Directory.Exists(SourcePath)) return this;
+
+        var sources = Directory.EnumerateFiles(SourcePath)
             .Where(file => file.EndsWith(".usfm"));
 
         if (sources.Any())
         {
-
-            //var mdtimes = Directory.EnumerateFiles(mdpath)
-            //	.Select(file => File.GetLastWriteTimeUtc(file));
-            //var sourcetimes = sources.Select(file => File.GetLastWriteTimeUtc(file));
-
-            //var mdtime = DateTime.MinValue;
-            //var sourcetime = DateTime.MinValue;
-
-            //foreach (var time in mdtimes) mdtime = time > mdtime ? time : mdtime;
-            //foreach (var time in sourcetimes) sourcetime = time > sourcetime ? time : sourcetime;
-
             Imported = true;
 
             int bookno = 1;
@@ -277,7 +251,7 @@ public class Importer
                 var book = bookm
                     .FirstOrDefault();
 
-                var namesfile = Path.Combine(mdpath, "src", "booknames.xml");
+                var namesfile = Path.Combine(ProjectPath, "src", "booknames.xml");
                 var useNames = File.Exists(namesfile);
 
                 XElement[] xmlbooks = new XElement[0];
@@ -425,7 +399,7 @@ public class Importer
                     src = Regex.Replace(src, @"(?<!^)(@[0-9]+)", $"{Environment.NewLine}$1", RegexOptions.Multiline);
                 }
 
-                var md = Path.Combine(mdpath, $"{booknostr}-{book}.md");
+                var md = Path.Combine(ProjectPath, $"{booknostr}-{book}.md");
                 bookno++;
                 if (!string.IsNullOrWhiteSpace(src))
                 {
@@ -434,24 +408,25 @@ public class Importer
                 }
             }
         }
+        return this;
     }
 
-    public void FromBibleEdit(string mdpath, string srcpath = null)
+    public Importer FromBibleEdit()
     {
-        if (srcpath == null) srcpath = Path.Combine(mdpath, "src");
+        if (Disabled || !Directory.Exists(SourcePath)) return this;
 
-        var root = Path.Combine(srcpath, "bibleedit");
+        var root = Path.Combine(SourcePath, "bibleedit");
         if (Directory.Exists(root))
         {
             Log("Import from BibleEdit");
 
-            var oldfiles = Directory.EnumerateFiles(srcpath, "*.usfm");
+            var oldfiles = Directory.EnumerateFiles(SourcePath, "*.usfm");
             foreach (var of in oldfiles) File.Delete(of);
 
             var folders = Directory.EnumerateDirectories(root).ToArray();
             if (folders.Length == 1) folders = Directory.EnumerateDirectories(Path.Combine(folders[0])).ToArray();
 
-            var namesfile = Path.Combine(srcpath, "booknames.xml");
+            var namesfile = Path.Combine(SourcePath, "booknames.xml");
             var books = Books[Language].Values;
 
             int fileno = 1;
@@ -498,17 +473,19 @@ public class Importer
                     txt.AppendLine(file);
                 }
 
-                var usfmfile = Path.Combine(srcpath, $"{index:d2}-{bookname}.usfm");
+                var usfmfile = Path.Combine(SourcePath, $"{index:d2}-{bookname}.usfm");
                 File.WriteAllText(usfmfile, txt.ToString());
                 LogFile(usfmfile);
             }
         }
-    }
-    public void FromTXT(string mdpath, string? srcpath = null)
-    {
-        if (srcpath == null) srcpath = Path.Combine(mdpath, "src");
 
-        var sources = Directory.EnumerateFiles(srcpath)
+        return this;
+    }
+    public Importer FromTXT()
+    {
+        if (Disabled || !Directory.Exists(SourcePath)) return this;
+
+        var sources = Directory.EnumerateFiles(SourcePath)
             .Where(file => file.EndsWith(".txt"));
 
         if (sources.Any())
@@ -544,7 +521,7 @@ public class Importer
                     {
                         if (book != null)
                         {
-                            md = Path.Combine(mdpath, $"{bookno++:D2}-{book}.md");
+                            md = Path.Combine(ProjectPath, $"{bookno++:D2}-{book}.md");
                             File.WriteAllText(md, s.ToString());
                             LogFile(md);
                             s.Clear();
@@ -566,7 +543,7 @@ public class Importer
 
                     string verse = m.Groups[3].Value;
                     string text = Regex.Replace(m.Groups[4].Value, @"\r?\n", " ").Trim();
-                    if (Program.ParagraphVerses)
+                    if (ParagraphVerses)
                     {
                         s.Append($"{(verse == "1" ? "" : (EachVerseOnNewLine ? $"{Environment.NewLine}" : " "))}@{verse} {text}");
                     }
@@ -576,17 +553,19 @@ public class Importer
                     }
                 }
             }
-            md = Path.Combine(mdpath, $"{bookno++:D2}-{book}.md");
+            md = Path.Combine(ProjectPath, $"{bookno++:D2}-{book}.md");
             File.WriteAllText(md, s.ToString());
             LogFile(md);
         }
+
+        return this;
     }
 
-    public void FromZefania(string mdpath, string? srcpath = null)
+    public Importer FromZefania()
     {
-        if (srcpath == null) srcpath = Path.Combine(mdpath, "src");
+        if (Disabled || !Directory.Exists(SourcePath)) return this;
 
-        var sources = Directory.EnumerateFiles(srcpath)
+        var sources = Directory.EnumerateFiles(SourcePath)
             .Where(file => file.EndsWith(".xml"));
 
         //var mdtimes = Directory.EnumerateFiles(mdpath)
@@ -633,25 +612,27 @@ public class Importer
                                 else text.Append(" ");
                             }
                             firstverse = false;
-                            if (Program.ParagraphVerses) text.Append($"@{((int)verse.Attribute("vnumber"))} ");
+                            if (ParagraphVerses) text.Append($"@{((int)verse.Attribute("vnumber"))} ");
                             else text.Append($"^{((int)verse.Attribute("vnumber"))}^ ");
                             text.Append(verse.Value);
                         }
                     }
 
-                    var md = Path.Combine(mdpath, file);
+                    var md = Path.Combine(ProjectPath, file);
                     File.WriteAllText(md, text.ToString());
                     LogFile(md);
                 });
             }
         }
+
+        return this;
     }
 
-    public void FromXmlOther(string mdpath, string? srcpath = null)
+    public Importer FromXmlOther()
     {
-        if (srcpath == null) srcpath = Path.Combine(mdpath, "src");
+        if (Disabled || !Directory.Exists(SourcePath)) return this;
 
-        var sources = Directory.EnumerateFiles(srcpath)
+        var sources = Directory.EnumerateFiles(SourcePath)
             .Where(file => file.EndsWith(".xml"));
 
         //var mdtimes = Directory.EnumerateFiles(mdpath)
@@ -699,13 +680,13 @@ public class Importer
                                 else text.Append(" ");
                             }
                             firstverse = false;
-                            if (Program.ParagraphVerses) text.Append($"@{((int)verse.Attribute("n"))} ");
+                            if (ParagraphVerses) text.Append($"@{((int)verse.Attribute("n"))} ");
                             else text.Append($"^{((int)verse.Attribute("n"))}^ ");
                             text.Append(verse.Value);
                         }
                     }
 
-                    var md = Path.Combine(mdpath, file);
+                    var md = Path.Combine(ProjectPath, file);
                     File.WriteAllText(md, text.ToString());
                     LogFile(md);
 
@@ -713,10 +694,12 @@ public class Importer
                 }
             }
         }
+
+        return this;
     }
 
     /// <summary>
-    /// Imports a Bible module of The SWORD Project. Place the module in the src folder, as the folders mods.d (with the
+    /// Imports a Bible module of The SWORD Project. Place the module in the SourcePath folder, as the folders mods.d (with the
     /// .conf file of the module) and modules (with its data), or as the zip file of the module, which is unpacked first.
     /// The module is read directly, no SWORD tools are needed. The drivers zText, zText4, RawText and RawText4 are
     /// supported (compressed with ZIP or LZSS, in UTF-8 or Latin-1), and the markup OSIS, GBF, ThML or Plain.
@@ -727,38 +710,38 @@ public class Importer
     /// module and written to booknames.xml in the src folder (an existing file is kept), and the books are named by
     /// them. A book whose heading has no usable name keeps its English name.
     /// </summary>
-    public void FromSWORD(string mdpath, string? srcpath = null, bool importBooknames = false)
+    public Importer FromSWORD(bool importBooknames = false)
     {
-        if (srcpath == null) srcpath = Path.Combine(mdpath, "src");
+        if (Disabled || !Directory.Exists(SourcePath)) return this;
 
-        var confpath = Path.Combine(srcpath, "mods.d");
-        var zip = Directory.EnumerateFiles(srcpath, "*.zip").FirstOrDefault();
+        var confpath = Path.Combine(SourcePath, "mods.d");
+        var zip = Directory.EnumerateFiles(SourcePath, "*.zip").FirstOrDefault();
         if (zip != null && !Directory.Exists(confpath))
         {
-            ZipFile.ExtractToDirectory(zip, srcpath, true);
+            ZipFile.ExtractToDirectory(zip, SourcePath, true);
         }
 
-        if (!Directory.Exists(confpath)) return;
+        if (!Directory.Exists(confpath)) return this;
         var confs = Directory.EnumerateFiles(confpath, "*.conf").Order().ToList();
 
         // Strong's dictionaries (and other dictionaries) are written to a binary file each; the Bible is the rest.
         foreach (var dictionary in confs.Where(SwordDictionary.IsDictionary).ToList())
         {
-            FromSWORDDictionary(dictionary, srcpath, mdpath);
+            FromSWORDDictionary(dictionary);
             confs.Remove(dictionary);
         }
 
-        if (confs.Count == 0) return;
+        if (confs.Count == 0) return this;
         if (confs.Count > 1) Log($"There are several SWORD modules in {confpath}, only {Path.GetFileName(confs[0])} is imported.");
 
         try
         {
-            var module = SwordModule.Open(confs[0], srcpath);
+            var module = SwordModule.Open(confs[0], SourcePath);
             var versification = module.Versification;
             Log($"Import from SWORD module {module.Name} (versification {versification.Name})");
 
             var localNames = importBooknames ? SwordBookNames(module, versification) : null;
-            if (localNames != null) WriteSwordBooknames(module, versification, localNames, srcpath);
+            if (localNames != null) WriteSwordBooknames(module, versification, localNames, SourcePath);
 
             foreach (var book in versification.Books)
             {
@@ -817,7 +800,7 @@ public class Importer
                 if (text.Length == 0) continue;
 
                 var name = string.Concat((localNames != null && localNames.TryGetValue(book.Number, out var local) ? local.Name : SwordBookName(book)).Select(ch => Path.GetInvalidFileNameChars().Contains(ch) ? '_' : ch));
-                var md = Path.Combine(mdpath, $"{book.Number:D2}-{name}.md");
+                var md = Path.Combine(ProjectPath, $"{book.Number:D2}-{name}.md");
                 File.WriteAllText(md, Regex.Replace(text.ToString(), @"\r?\n", nl));
                 Imported = true;
                 LogFile(md);
@@ -827,6 +810,7 @@ public class Importer
         {
             Log($"The SWORD module {Path.GetFileName(confs[0])} cannot be imported: {ex.Message}");
         }
+        return this;
     }
 
     // ---- e-Sword and MySword ----------------------------------------------------------------------------
@@ -837,47 +821,49 @@ public class Importer
     /// SQLite library is needed). The books of the canon, 1 to 66, are imported, with their headings, footnotes, the words
     /// of Jesus and, if <see cref="ImportStrongs"/> is set, the Strong's numbers.
     /// </summary>
-    public void FromESword(string mdpath, string? srcpath = null) =>
-        FromSqliteModules("e-Sword", mdpath, srcpath, [".bblx", ".bbli"], [".dctx", ".dcti", ".lexi"]);
+    public Importer FromESword() =>
+        FromSqliteModules("e-Sword", [".bblx", ".bbli"], [".dctx", ".dcti", ".lexi"]);
 
     /// <summary>
     /// Imports a Bible module of MySword (.bbl.mybible) and a Strong's dictionary of MySword (.dct.mybible), like
     /// <see cref="FromESword"/> does for e-Sword: the two programs have the same format of Bible modules.
     /// </summary>
-    public void FromMySword(string mdpath, string? srcpath = null) =>
-        FromSqliteModules("MySword", mdpath, srcpath, [".bbl.mybible"], [".dct.mybible"]);
+    public Importer FromMySword() =>
+        FromSqliteModules("MySword", [".bbl.mybible"], [".dct.mybible"]);
 
-    void FromSqliteModules(string program, string mdpath, string? srcpath, string[] bibleExtensions, string[] dictionaryExtensions)
+    Importer FromSqliteModules(string program, string[] bibleExtensions, string[] dictionaryExtensions)
     {
-        if (srcpath == null) srcpath = Path.Combine(mdpath, "src");
-        if (!Directory.Exists(srcpath)) return;
+        if (Disabled || !Directory.Exists(SourcePath)) return this;
+
         var extensions = bibleExtensions.Concat(dictionaryExtensions).ToArray();
         bool Is(string file, string[] of) => of.Any(e => file.EndsWith(e, StringComparison.OrdinalIgnoreCase));
 
-        List<string> Modules() => Directory.EnumerateFiles(srcpath, "*", SearchOption.AllDirectories).Where(f => Is(f, extensions)).Order().ToList();
+        List<string> Modules() => Directory.EnumerateFiles(SourcePath, "*", SearchOption.AllDirectories).Where(f => Is(f, extensions)).Order().ToList();
         var modules = Modules();
         if (modules.Count == 0)
         {
             // a zip that has such modules is unpacked (a zip of a SWORD module is left to FromSWORD)
-            foreach (var zip in Directory.EnumerateFiles(srcpath, "*.zip"))
+            foreach (var zip in Directory.EnumerateFiles(SourcePath, "*.zip"))
             {
                 using (var archive = ZipFile.OpenRead(zip))
                     if (!archive.Entries.Any(e => Is(e.FullName, extensions))) continue;
-                ZipFile.ExtractToDirectory(zip, srcpath, true);
+                ZipFile.ExtractToDirectory(zip, SourcePath, true);
             }
             modules = Modules();
         }
-        if (modules.Count == 0) return;
+        if (modules.Count == 0) return this;
 
         foreach (var dictionary in modules.Where(f => Is(f, dictionaryExtensions)))
-            ImportSqliteDictionary(program, dictionary, mdpath);
+            ImportSqliteDictionary(program, dictionary);
 
         var bibles = modules.Where(f => Is(f, bibleExtensions)).ToList();
-        if (bibles.Count > 1) Log($"There are several {program} Bibles in {srcpath}, only {Path.GetFileName(bibles[0])} is imported.");
-        if (bibles.Count > 0) ImportSqliteBible(program, bibles[0], mdpath);
+        if (bibles.Count > 1) Log($"There are several {program} Bibles in {SourcePath}, only {Path.GetFileName(bibles[0])} is imported.");
+        if (bibles.Count > 0) ImportSqliteBible(program, bibles[0]);
+
+        return this;
     }
 
-    void ImportSqliteBible(string program, string file, string mdpath)
+    void ImportSqliteBible(string program, string file)
     {
         try
         {
@@ -943,10 +929,10 @@ public class Importer
 
                 var book = SwordVersification.KJV.Books.First(b => b.Number == number);
                 var name = string.Concat(SwordBookName(book).Select(ch => Path.GetInvalidFileNameChars().Contains(ch) ? '_' : ch));
-                var md = Path.Combine(mdpath, $"{number:D2}-{name}.md");
-                File.WriteAllText(md, Regex.Replace(text.ToString(), @"\r?\n", nl));
+                var mdfile = Path.Combine(ProjectPath, $"{number:D2}-{name}.md");
+                File.WriteAllText(mdfile, Regex.Replace(text.ToString(), @"\r?\n", nl));
                 Imported = true;
-                LogFile(md);
+                LogFile(mdfile);
             }
         }
         catch (Exception ex) when (ex is InvalidDataException or IOException or NotSupportedException)
@@ -956,7 +942,7 @@ public class Importer
     }
 
     /// <summary>Imports a Strong's dictionary of e-Sword or MySword to the database strongs.db, like the one of SWORD.</summary>
-    void ImportSqliteDictionary(string program, string file, string mdpath)
+    void ImportSqliteDictionary(string program, string file)
     {
         try
         {
@@ -983,7 +969,7 @@ public class Importer
                 return;
             }
 
-            var target = Path.Combine(mdpath, StrongsDatabase.FileName);
+            var target = Path.Combine(ProjectPath, StrongsDatabase.FileName);
             if (File.Exists(target)) File.Delete(target);
             StrongsDatabase.Write(target, entries);
             Imported = true;
@@ -1002,11 +988,11 @@ public class Importer
     /// dictionaries share the database. Entries whose key is not a Strong's number (the introduction of the module)
     /// are left out.
     /// </summary>
-    public void FromSWORDDictionary(string conf, string srcpath, string mdpath)
+    void FromSWORDDictionary(string conf)
     {
         try
         {
-            var dictionary = SwordDictionary.Open(conf, srcpath);
+            var dictionary = SwordDictionary.Open(conf, SourcePath);
             Log($"Import from SWORD dictionary {dictionary.Name}");
             if (dictionary.StrongsPrefix == null)
                 Log($"The SWORD dictionary {dictionary.Name} is not marked as Greek or Hebrew: only entries with keys such as G26 or H7225 are imported.");
@@ -1025,7 +1011,7 @@ public class Importer
                 return;
             }
 
-            var file = Path.Combine(mdpath, StrongsDatabase.FileName);
+            var file = Path.Combine(ProjectPath, StrongsDatabase.FileName);
             if (File.Exists(file)) File.Delete(file);
             StrongsDatabase.Write(file, entries);
             Imported = true;
@@ -1091,16 +1077,7 @@ public class Importer
     /// An abbreviation of a book name: its number ("1. Mose" has "1") and the first letters of its name, 3 in all
     /// ("1Mo", "Mat"; "Matthäus" is "Mat"). More letters make longer abbreviations for names that start alike.
     /// </summary>
-    public static string Abbreviate(string name, int length)
-    {
-        var number = Regex.Match(name, @"^\s*([0-9]+)\.?\s*");
-        var prefix = number.Success ? number.Groups[1].Value : "";
-        var letters = string.Concat(name[number.Length..].Where(char.IsLetter));
-        if (letters.Length == 0) return prefix.Length > 0 ? prefix : name;
-        int count = Math.Max(1, length - prefix.Length);
-        var abbreviation = prefix + char.ToUpperInvariant(letters[0]) + letters[1..Math.Min(letters.Length, count)].ToLowerInvariant();
-        return abbreviation;
-    }
+    public string Abbreviate(string name, int length) => Transform.Abbreviate(name, length);
 
     /// <summary>
     /// Writes booknames.xml in the src folder: the English names (with the OSIS ids) and the names of the module, which
@@ -1136,83 +1113,17 @@ public class Importer
         return book.Name;
     }
 
-    public static Outline ReadOutlines(string path)
+
+    public Importer ParallelVerses(string path = null)
     {
-        Outline items = new Outline();
+        if (path == null) path = SourcePath;
+        if (Disabled || !Directory.Exists(path)) return this;
 
-        var files = Directory.EnumerateFiles(path, "*.md")
-            .Where(file => file.EndsWith("outline.md", StringComparison.OrdinalIgnoreCase))
-            .Concat(Directory.EnumerateFiles(path, "*.xml")
-            .Where(file => file.EndsWith("outline.xml", StringComparison.OrdinalIgnoreCase)))
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        foreach (var file in files.ToList())
-        {
-            if (file.EndsWith(".xml") && files.Contains(Path.ChangeExtension(file, ".md"))) files.Remove(file);
-        }
-
-        foreach (var file in files)
-        {
-            if (file.EndsWith(".md")) items.AddMdOutline(file);
-            else if (file.EndsWith(".xml")) items.AddXmlOutline(file);
-        }
-
-        items.Sort();
-
-        // remove ParagraphItems that are duplicate of a TitleItem and remove duplicate BookItems and ChapterItems
-        var temp = items;
-        items = new Outline();
-        items.Append = temp.Append;
-        List<OutlineItem> sameLocation = new List<OutlineItem>(10);
-        for (int i = 0; i < temp.Count;)
-        {
-            int j = i + 1;
-            sameLocation.Add(temp[i]);
-            while (j < temp.Count && Location.Compare(temp[i].Location, temp[j].Location) == 0)
-            {
-                sameLocation.Add(temp[j++]);
-            }
-            i = j;
-            IEnumerable<OutlineItem> toAdd;
-            if (sameLocation.Any(x => x is TitleItem)) toAdd = sameLocation.Where(x => !(x is ParagraphItem));
-            else toAdd = sameLocation;
-            if (toAdd.OfType<BookItem>().Count() > 1) toAdd = toAdd
-                    .Where(x => !(x is BookItem))
-                    .Concat(
-                        toAdd.OfType<BookItem>()
-                            .Take(1)
-                    );
-            if (toAdd.OfType<ChapterItem>().Count() > 1) toAdd = toAdd
-                    .Where(x => !(x is ChapterItem))
-                    .Concat(
-                        toAdd.OfType<ChapterItem>()
-                            .Take(1)
-                    );
-            items.AddRange(toAdd);
-            sameLocation.Clear();
-        }
-
-        BookItem? bookItem = null;
-        // set BookItem items collection
-        foreach (var item in items)
-        {
-            if (item is BookItem)
-            {
-                bookItem = (BookItem)item;
-                bookItem.Items.Clear();
-            }
-            else if (bookItem != null && item.Location.Book.Number == bookItem.Location.Book.Number) bookItem.Items.Add(item);
-        }
-
-        return items;
-    }
-
-    public static void ParallelVerses(string path)
-    {
-        Outline items = new Outline();
+        Outline items = new Outline(Transform);
 
         // import parallel verses
         int lastbook = -1, lastchapter = -11;
-        foreach (var parverse in new ParallelVerses().Load(Path.Combine(path, "src")))
+        foreach (var parverse in new ParallelVerses(Transform).Load(base.SourcePath))
         {
             StringBuilder footnote = new StringBuilder($"^[**{parverse.Verse.Chapter}:{(parverse.Verse.Verse > 1 ? parverse.Verse.Verse : 1)}** ");
             bool firstpv = true;
@@ -1240,201 +1151,55 @@ public class Importer
 
         items.Append = true;
         if (items.Count > 0) items.Save(Path.Combine(path, "ParallelVerses.outline.md"));
-    }
-    public string ApplyOutline(string src, string file, Outline? items) => ApplyOutline(src, file, items, Books, Log, FootnoteLabel);
 
-    public static string ApplyOutline(string src, string file, Outline? items, BookList Books, Action<string> Log, Func<int, string> FootnoteLabel)
-    {
-        if (items == null || items.Count == 0) return src;
-
-        var srcname = Path.GetFileName(file);
-        string bookname = Books.Name(srcname);
-
-        var bookItem = items
-            .OfType<BookItem>()
-            .FirstOrDefault(b => b.File == srcname);
-        if (bookItem == null)
-        {
-            Log($"Book for {Regex.Replace(srcname, @"(^[0-9]{2}(\.[0-9]+)?-)|(.md$)", "")} not found in outline.md");
-            return src;
-            //continue; // use when loop with foreach for sequential loop for debugging
-        }
-        // remove current outline
-
-        bool replaced = true;
-        if (!items.Append && items.OfType<FootnoteItem>().Any())
-        {
-            // remove bibmark footnotes.
-            while (replaced)
-            {
-                replaced = false;
-                src = Regex.Replace(src, @"\^(?<mark>[a-zA-Z]+)\^(?!\[)(?<text>.*?)(?:\^\k<mark>(?<footnote>\^\[(?>\[(?<c>)|[^\[\]]+|\](?<-c>))*(?(c)(?!))\]))[ \t]*\r?\n?", m =>
-                {
-                    replaced = true;
-                    return $"{m.Groups["footnote"].Value}{m.Groups["text"].Value}";
-                }, RegexOptions.Singleline);
-            }
-        }
-        if (!items.Append && items.OfType<ParagraphItem>().Any())
-        {
-            src = Regex.Replace(src, @"(\r?\n|^)[ \t]*\r?\n(?![ \t]*#)", "", RegexOptions.Singleline); // remove blank line
-        }
-        //src = Regex.Replace(src, @"(?<!(^|\n)#.*?)\r?\n(?![ \t]*#)", " ", RegexOptions.Singleline);
-        src = Regex.Replace(src, "  +", " "); // remove multiple spaces.
-
-
-        if (!items.Append && items.OfType<TitleItem>().Any())
-        {
-            src = Regex.Replace(src, @"(?<=^|\n)##+.*?\r?\n", "", RegexOptions.Singleline); // remove titles
-        }
-        // src = Regex.Replace(src, @"(\s*\^[a-zA-Z]+\^)|(([ \t]*\^[a-zA-Z]+\^\[[^\]]*\])+([ \t]*\r?\n)?)", "", RegexOptions.Singleline); // remove footnotes
-        src = Regex.Replace(src, @"//!verse-paragraphs.*?(\r?\n|$)", "", RegexOptions.Singleline); // remove verse paragraphs
-
-        if (bookItem.VerseParagraphs) src = $"//!verse-paragraphs{Environment.NewLine}{src}";
-
-        var frames = bookItem.Items.GetEnumerator();
-        //var book = Books["default", bookname];
-        OutlineItem? frame = frames.MoveNext() ? frames.Current : null;
-        int chapter = 0;
-        int verse = -1;
-
-        src = Regex.Replace(src, @"(?<=^|\n)#[ \t]+(?<chapter>[0-9]+)(\s*\r?\n|$)|\^(?<verse>[0-9]+)\^.*?(?=\s*\^[0-9]+\^|\s*@[0-9]+|\s*#|\s*$)|@(?<verse2>[0-9]+).*?(?=\s*\^[0-9]+\^|\s*@[0-9]+|\s*#|\s*$)|(?<=(^|\n)#[ \t]+[0-9]+[ \t]*\r?\n(##[ \t]+.*?\r?\n)?)(?<empty>.*?)(?=\s*\\?\s*\^1\^|\s*\\?\s*@1|\s*#|\s*$)", m =>
-        // empty is special text at the beginning of a psalm without verse number
-        {
-            var txt = m.Value;
-
-            if (m.Groups["chapter"].Success) // chapter
-            {
-                int.TryParse(m.Groups["chapter"].Value, out chapter); verse = -1;
-            }
-            else if (m.Groups["verse"].Success) // verse
-            {
-                int.TryParse(m.Groups["verse"].Value, out verse);
-            }
-            else if (m.Groups["verse2"].Success) // verse
-            {
-                int.TryParse(m.Groups["verse2"].Value, out verse);
-            }
-            else if (m.Groups["empty"].Success) //introduction line of a psalm
-            {
-                verse = 0;
-            }
-
-            while (frame != null && frame.Chapter <= chapter && frame.Verse <= verse)
-            {
-
-                if (frame is TitleItem)
-                {
-                    if (Regex.IsMatch(txt, "^#"))
-                    {
-                        txt = $"{txt}## {((TitleItem)frame).Title}{Environment.NewLine}"; // insert title after a chapter title
-                    }
-                    // insert title after a verse
-                    else txt = $"{txt}{Environment.NewLine}{Environment.NewLine}## {((TitleItem)frame).Title}{Environment.NewLine}";
-                }
-                else if (frame is FootnoteItem)
-                {
-                    txt = $"{txt} {((FootnoteItem)frame).Footnote}";
-                }
-                else if (frame is ParagraphItem)
-                {
-                    txt = $"{txt}{Environment.NewLine}{Environment.NewLine}";
-                }
-
-                frame = frames.MoveNext() ? frames.Current : null;
-            }
-
-            return txt;
-        }, RegexOptions.Singleline);
-
-        // remove whitespace before a verse on a new line
-        src = Regex.Replace(src, @"(?<=(^|\n))[ \t]+(\^[0-9]+\^|@[0-9]+)", "$2", RegexOptions.Singleline);
-
-        // hack because of bad output
-        // remove empty lines after ## title
-        src = Regex.Replace(src, @"(?<=(^|\n)##[^\r\n]*?\r?\n)([ \t]*\r?\n)+", "", RegexOptions.Singleline);
-        // remove multiple emtpy lines
-        src = Regex.Replace(src, @"(?<=(^|\n))([ \t]*\r?\n)+[ \t]*(?=\r?\n)", "", RegexOptions.Singleline);
-
-        // remove bibmark footnotes
-        /* replaced = true;
-        while (replaced)
-        {
-            replaced = false;
-            src = Regex.Replace(src, @"\^(?<mark>[a-zA-Z]+)\^(?!\[)(?<text>.*?)(?:\^\k<mark>(?<footnote>\^\[(?>\[(?<c>)|[^\[\]]+|\](?<-c>))*(?(c)(?!))\]))[ \t]*\r?\n?", m =>
-            {
-                replaced = true;
-                return $"{m.Groups["footnote"].Value}{m.Groups["text"].Value}";
-            }, RegexOptions.Singleline);
-        } */
-
-        // apply bibmark footnotes
-        replaced = true;
-        int markno = 1;
-        while (replaced)
-        {
-            replaced = false;
-            src = Regex.Replace(src, @"(?<!\^[a-zA-Z]+)\^\[(?<footnote>(?>\[(?<c>)|[^\[\]]+|\](?<-c>))*(?(c)(?!)))\](?<text>.*?)(?=\r?\n[ \t]*\r?\n)", m =>
-            {
-                replaced = true;
-                string space;
-                if (markno == 1) space = "\r\n"; else space = " ";
-                return $"^{FootnoteLabel(markno)}^{m.Groups["text"].Value}{space}^{FootnoteLabel(markno)}^[{m.Groups["footnote"].Value}]";
-            }, RegexOptions.Singleline);
-            markno++;
-        }
-
-        return src;
+        return this;
     }
 
-    public void Outline(string path)
+    public Importer Outline()
     {
-
-        if (Imported)
+        if (!Disabled && Imported)
         {
-            var mdfiles = Directory.EnumerateFiles(path, "*.md")
+            var mdfiles = Directory.EnumerateFiles(SourcePath, "*.md")
                 .Where(file => Regex.IsMatch(Path.GetFileName(file), @"^([0-9][0-9])(?!.*?\.outline\.md)"));
-
-            var mdtimes = mdfiles.Select(file => File.GetLastWriteTimeUtc(file));
 
             Books.Load(mdfiles);
 
-            Outline items = ReadOutlines(Path.Combine(path, "src"));
+            Outline items = new Outline(Transform).Read(base.SourcePath);
 
             if (items.Count > 0)
             {
                 Log("Importing Outline...");
 
-                //Parallel.ForEach(mdfiles, srcfile =>
                 foreach (var srcfile in mdfiles)
                 {
 
                     File.SetLastWriteTimeUtc(srcfile, DateTime.Now);
                     var src = File.ReadAllText(srcfile);
 
-                    var modsrc = ApplyOutline(src, srcfile, items);
+                    var modsrc = items.Apply(src, srcfile);
 
                     if (src != modsrc)
                     {
                         File.WriteAllText(srcfile, modsrc);
                         LogFile(srcfile);
                     }
-                    //});
                 }
             }
         }
+
+        return this;
     }
 
-    public void FromJavascripture(string mdpath, string? srcpath = null)
+    public Importer FromJavascripture()
     {
-        if (srcpath == null) srcpath = Path.Combine(mdpath, "src");
+        if (Disabled || !Directory.Exists(base.SourcePath)) return this;
 
-        var json = System.IO.Directory.EnumerateFiles(srcpath, "*.json")
+        var json = System.IO.Directory.EnumerateFiles(SourcePath, "*.json")
             .Select(file => File.ReadAllText(file))
             .Where(src => src.Contains("\"version\":") && src.Contains("\"versionName\":") && src.Contains("\"books\":"))
             .Select(src => JObject.Parse(src))
             .FirstOrDefault();
-        if (json == null) return;
+        if (json == null) return this;
         var books = json["books"] as JObject;
         int bookno = 1;
         foreach (var book in books.Properties())
@@ -1483,11 +1248,12 @@ public class Importer
             }
 
             string mdfile;
-            if (bookInfo != null) mdfile = Path.Combine(mdpath, $"{bookInfo.Number}-{bookInfo.Name}.md");
+            if (bookInfo != null) mdfile = Path.Combine(ProjectPath, $"{bookInfo.Number}-{bookInfo.Name}.md");
             else mdfile = $"{bookno++}-{name}.md";
             File.WriteAllText(mdfile, sb.ToString());
             LogFile(mdfile);
         }
 
+        return this;
     }
 }
