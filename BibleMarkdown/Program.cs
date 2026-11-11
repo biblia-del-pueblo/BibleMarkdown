@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Microsoft.CodeAnalysis.CSharp.Syntax;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.Tracing;
@@ -124,6 +125,23 @@ For examples of the various input files like booknames.xml, linklist.xml, outlin
 you can have a look at the Bibles in the BibliaLibre project at
 https://github.com/biblia-del-pueblo/BibliaLibre.
 
+syntax:
+
+  - bimark [path to bible project folder] {path to import source folder] [output path] [options]
+    Invokes bibmark to process all files in the current folder.
+  - bibmark import [path to import source folder] [options]
+    Imports bibles into bibmark format from the source folder. 
+  - bibmark publish [bibles source folder] [www publish folder]
+    Zips every Bible in bibles source folder  into www publish folder/books, together with a
+    books/index.json that lists the zips and the info.json of each Bible, and copies the
+    pdf, md, epub, html, xml and zip files of the out folders to www folder/out/Bible
+    (the html, tex and usfm folders as one zip each, the pandoc folder not at all).
+    Nothing is converted.
+    Use this option to create an online repository of Bibles for CorssBible reader.
+  - bibmark twolanguage <path to left column bible> <path to right column bible>
+    Produces a double column, two language bible, with the single language bibles
+    located in left and right path's.
+
 Options:
   - -p, -project or --project <project path>
     The path of the bible project to process. Defaults to the current direcroty if ommited.
@@ -148,18 +166,8 @@ Options:
     then split into tokens. Every pair of tokens describes a global replacement directive,
     where the first token is a Regex expression, and the second token is a
     Regex replacement string.
-  - -twolanguage or --twolanguage <path1> <path2>
-    Produces a double column, two language bible, with the single language bibles
-    located in path1 and path2.
   - -strongs or --strongs
     Import Strong number syntax from USFM files and SWORD modules.
-  - -publish or --publish <biblesPath> <wwwPath>
-    Zips every Bible folder in biblesPath into wwwPath/books, together with a books/index.json
-    that lists the zips and the info.json of each Bible, and copies the pdf, md, epub, html, xml
-    and zip files of the out folders to wwwPath/out/Bible (the html, tex and usfm folders as one
-    zip each, the pandoc folder not at all).
-    Nothing is converted.
-    Use this option to create an online repository of Bibles for CorssBible reader.
   - -v, -version or --version
     Displays the bibmark & pandoc version.
   ");
@@ -172,17 +180,15 @@ Options:
         // -publish biblesPath wwwPath: zips the Bibles and lists them in an index.json, then ends (no conversion).
         Transform? Transform;
         string? projectPath = null, sourcePath = null, outputPath = null;
-        var publishpos = Array.IndexOf(args, "-publish");
-        if (publishpos < 0) publishpos = Array.IndexOf(args, "--publish");
-        if (publishpos >= 0)
+        if (args.FirstOrDefault() == "publish")
         {
-            if (publishpos + 2 >= args.Length)
+            if (args.Length >= 2)
             {
-                Log("Usage: bibmark -publish biblesPath wwwPath");
+                Log("Usage: bibmark publish biblesPath wwwPath");
                 return;
             }
-            sourcePath = args[publishpos + 1];
-            var destPath = args[publishpos + 2];
+            sourcePath = args[1];
+            var destPath = args[2];
             Transform = new Transform("", sourcePath, destPath);
             Transform.Publish.Bibles();
             return;
@@ -257,6 +263,10 @@ Options:
         }
 
         var argslist = args.ToList();
+        var command = argslist.FirstOrDefault();
+        if (command == "import" || command == "publish" || command == "twolanguage")
+            argslist.RemoveAt(0);
+
         var projectPos = argslist.IndexOf("-p");
         if (projectPos < 0) projectPos = argslist.IndexOf("-project");
         if (projectPos < 0) projectPos = argslist.IndexOf("--project");
@@ -281,6 +291,7 @@ Options:
                 argslist.RemoveAt(sourcePos);
             }
         }
+
         var outPos = argslist.IndexOf("-o");
         if (outPos < 0) outPos = argslist.IndexOf("-out");
         if (outPos < 0) outPos = argslist.IndexOf("--out");
@@ -311,17 +322,20 @@ Options:
         }
 
         string? left = null, right = null;
-        bool twolang = false;
-        var twolangpos = argslist.IndexOf("-twolanguage");
-        if (twolangpos < 0) twolangpos = argslist.IndexOf("--twolanguage");
-        if (twolangpos >= 0 && twolangpos + 2 < argslist.Count)
+        bool twolang = command == "twolanguage";
+        if (twolang && argslist.Count >= 2)
         {
-            argslist.RemoveAt(twolangpos);
-            left = args[twolangpos];
-            argslist.RemoveAt(twolangpos);
-            right = args[twolangpos];
-            argslist.RemoveAt(twolangpos);
-            twolang = true;
+            left = argslist[0];
+            argslist.RemoveAt(0);
+            right = argslist[0];
+            argslist.RemoveAt(0);
+        }
+        
+        if (command == "import" && argslist.Count >= 1)
+        {
+            sourcePath = argslist[0];
+            argslist.RemoveAt(0);
+            fromSource = true;
         }
 
         var lowercaseFirstWords = argslist.Contains("-plc") || argslist.Contains("--plc") || argslist.Contains("--lowercase-first-words");

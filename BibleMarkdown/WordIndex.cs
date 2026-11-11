@@ -243,9 +243,10 @@ public static class WordIndex
     // ---- Searching ---------------------------------------------------------------------------------------
 
     /// <summary>
-    /// The verses that have some of the <paramref name="terms"/>, best match first. The score of a verse is the number
-    /// of different searched words in it, and half a point more for every two searched words that stand next to each
-    /// other in the order of the phrase. Verses with the same score are in the order of the Bible.
+    /// The verses that have some of the <paramref name="terms"/>, best match first. The score of a verse is the sum of
+    /// the weights of the different searched words in it (see <see cref="Weight"/>: rare words count much, common and
+    /// short words such as "and" or "the" hardly), plus the weights of two words once more for every two searched words
+    /// that stand next to each other in the order of the phrase. Verses with the same score are in the order of the Bible.
     /// </summary>
     /// <param name="limit">The most verses to return (0 for all).</param>
     public static List<WordHit> Search(string indexFile, IReadOnlyList<string> terms, int limit = 100)
@@ -257,28 +258,52 @@ public static class WordIndex
 
         // for every verse: where the searched words are in it (the index of the word in the phrase and its place in the verse)
         var verses = new Dictionary<(int Book, int Chapter, int Verse), List<(int Term, int Position)>>();
+        var weights = new double[terms.Count]; // 0 for a word that is not in the Bible
         for (int term = 0; term < terms.Count; term++)
         {
             if (words.FindById(terms[term]) is not { } entry) continue; // the word is not in the Bible
+            int verseCount = 0; // in how many verses the word is: the places are in the order of the Bible, so a verse is one run
+            (int, int, int) previous = default;
             foreach (var place in WordPlace.Decode(entry.Places))
             {
                 var key = (place.Book, place.Chapter, place.Verse);
+                if (verseCount == 0 || key != previous) verseCount++;
+                previous = key;
                 if (!verses.TryGetValue(key, out var found)) verses[key] = found = new List<(int, int)>();
                 found.Add((term, place.Position));
             }
+            weights[term] = Weight(terms[term], verseCount);
         }
 
         var hits = verses.Select(v =>
         {
             var places = v.Value;
-            double score = places.Select(p => p.Term).Distinct().Count();
+            double score = places.Select(p => p.Term).Distinct().Sum(term => weights[term]);
             var positions = places.ToHashSet();
+            // two searched words next to each other in the order of the phrase count their weights once more, so a verse
+            // that has the phrase beats one that only has its words, and a pair of common words adds hardly anything
             for (int term = 0; term + 1 < terms.Count; term++)
-                if (places.Any(p => p.Term == term && positions.Contains((term + 1, p.Position + 1)))) score += 0.5;
+                if (places.Any(p => p.Term == term && positions.Contains((term + 1, p.Position + 1))))
+                    score += weights[term] + weights[term + 1];
             return new WordHit(v.Key.Book, v.Key.Chapter, v.Key.Verse, score);
         })
         .OrderByDescending(h => h.Score).ThenBy(h => h.Book).ThenBy(h => h.Chapter).ThenBy(h => h.Verse);
         return (limit > 0 ? hits.Take(limit) : hits).ToList();
+    }
+
+    // About the number of verses of a Bible; it only has to be near, as it is used to see how common a word is.
+    const double TotalVerses = 31000;
+
+    /// <summary>
+    /// How much a hit of a word counts, from 0.05 (a word in nearly every verse) to 1 (a word in very few verses): the
+    /// rarer the word, the more it says (inverse document frequency). Short words of up to 3 letters (and, the, of, in)
+    /// are weakened again, as they carry little meaning even where they are not that common.
+    /// </summary>
+    static double Weight(string word, int verseCount)
+    {
+        double idf = Math.Log(1 + TotalVerses / verseCount) / Math.Log(1 + TotalVerses); // 1 for 1 verse, near 0 for all
+        double weight = word.Length <= 3 ? idf * idf : idf;
+        return Math.Max(0.05, weight);
     }
 
     /// <summary>The markdown of a verse with the searched words (normalized, see <see cref="Terms"/>) in bold.</summary>
