@@ -40,7 +40,7 @@ public class Creator: WithTransform
             return culture?.Name ?? "en";
         }
     }
-    public string SwordVersification { get; set; } = "KJV";
+    public string? SwordVersification { get; set; }
     public bool TwoLanguage { get; set; } = false;
 
     Epub? epub;
@@ -787,7 +787,7 @@ public class Creator: WithTransform
         Books.Load();
 
         Outline.Read(ProjectPath);
-        var files = Directory.EnumerateFiles(OutputPath, "*.md")
+        var files = Directory.EnumerateFiles(ProjectPath, "*.md")
             .Where(file => Regex.IsMatch(Path.GetFileName(file), @"^[0-9.]+-.*?(?!outline.md$|map.md$)"));
         if (files.Any())
         {
@@ -795,7 +795,7 @@ public class Creator: WithTransform
             ToVerseStats();
             var osisFile = Path.Combine(OutputPath, "osis", $"{Path.GetFileName(ProjectPath)}.xml");
             ToOSIS(files, osisFile);
-            await ToSWORDAsync(osisFile, Path.Combine(OutputPath, "out", "sword", "modules", "texts", "ztext", Path.GetFileName(OutputPath)));
+            await ToSWORDAsync(osisFile, Path.Combine(OutputPath, "sword", "modules", "texts", "ztext", Path.GetFileName(OutputPath)));
             Log("Convert to Pandoc...");
             await Task.WhenAll(files.AsParallel().Select(file => TransformFileAsync(file)));
         }
