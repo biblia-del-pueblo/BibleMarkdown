@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <PackAsTool Condition="$(PackAsTool) == ''">true</PackAsTool>
+        <PackAsTool Condition="$(PackAsTool) == ''">false</PackAsTool>
 
         <TargetFrameworks Condition="$(PackAsTool) == 'false'">net10.0;net11.0</TargetFrameworks>
         <TargetFrameworks Condition="$(PackAsTool) != 'false'">net11.0</TargetFrameworks>
@@ -38,7 +38,7 @@
     </PropertyGroup>
 
     <PropertyGroup Condition="$(PackAsTool) == 'true'">
-        <PackageReadmeFile>tools/net10.0/any/README.md</PackageReadmeFile>
+        <PackageReadmeFile>tools/net11.0/any/README.md</PackageReadmeFile>
         <PackageId>BibleMarkdown</PackageId>
         <StartupObject Condition="$(PackAsTool) == 'true'">BibleMarkdown.Program</StartupObject>
         <OutputType>Exe</OutputType>
@@ -66,21 +66,21 @@
         </None>
         <None Condition="$(PackAsTool) == 'true'" Include="..\README.md">
             <Pack>True</Pack>
-            <PackagePath>/tools/net10.0/any/</PackagePath>
+            <PackagePath>/tools/net11.0/any/</PackagePath>
         </None>
     </ItemGroup>
 
 
     <ItemGroup Condition="$(PackAsTool) == 'true'">
         <None Update="runtimes\**\*.*"
-            Pack="True" PackagePath="/tools/net10.0/any">
+            Pack="True" PackagePath="/tools/net11.0/any">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>
     </ItemGroup>
     
     <ItemGroup Condition="$(PackAsTool) != 'true'">
         <None Update="runtimes\**\*.*"
-            Pack="True" PackagePath="/lib/net10.0">
+            Pack="True" PackagePath="/lib/net11.0">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>
     </ItemGroup>

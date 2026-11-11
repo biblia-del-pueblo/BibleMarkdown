@@ -70,7 +70,7 @@ public class InstallableBook
 
         return await Task.Run(() =>
         {
-            if (!BibleMarkdown.WordIndex.IsCurrent(indexFile)) new BibleMarkdown.Importer().CreateIndex(ConfigPath);
+            if (!BibleMarkdown.WordIndex.IsCurrent(indexFile)) new BibleMarkdown.Transform(ConfigPath).Index.Create();
             var hits = BibleMarkdown.WordIndex.Search(indexFile, terms, limit);
 
             // the books are those of the folder; their verses are read once for every book that has a hit

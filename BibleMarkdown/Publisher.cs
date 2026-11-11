@@ -241,7 +241,7 @@ public class Publisher: WithTransform
                 if (!Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories).Any()) continue;
                 Directory.CreateDirectory(subtarget);
                 var zip = Path.Combine(subtarget, $"{bible}.{name.ToLowerInvariant()}.zip");
-                ZipFolder(folder, zip, SearchOption.TopDirectoryOnly, file => );
+                ZipFolder(folder, zip, SearchOption.TopDirectoryOnly);
                 count++;
             }
             else count += CopyOut(folder, subtarget, bible, top: false);

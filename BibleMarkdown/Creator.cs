@@ -799,6 +799,5 @@ public class Creator: WithTransform
             Log("Convert to Pandoc...");
             await Task.WhenAll(files.AsParallel().Select(file => TransformFileAsync(file)));
         }
-
     }
 }

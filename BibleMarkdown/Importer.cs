@@ -70,23 +70,6 @@ public class Importer: WithTransform
         }
         return this;
     }
-    public int IndexSize = 0;
-    /// <summary>
-    /// Creates the index of all the words of the books in <paramref name="mdpath"/>: a LiteDB database
-    /// (<see cref="WordIndex.FileName"/>, in the same folder) with an entry for every word of every verse, its book,
-    /// chapter and verse, and its place in the verse. See <see cref="WordIndex"/>; the index is searched with
-    /// <see cref="WordIndex.Search"/>.
-    /// </summary>
-    /// <returns>The number of words in the index.</returns>
-    public Importer CreateIndex()
-    {
-        if (Disabled || !Directory.Exists(SourcePath)) return this;
-
-        Log("Create the word index");
-        IndexSize = WordIndex.Create(base.ProjectPath);
-        LogFile(Path.Combine(base.ProjectPath, WordIndex.FileName), $"Created, {IndexSize} words,");
-        return this;
-    }
 
     /// <summary>The name of the file that stores the <see cref="InstallableBook"/> entry of a Bible, in the folder of its books.</summary>
     public const string InfoFileName = "info.json";

@@ -24,6 +24,8 @@ namespace BibleMarkdown
         public Creator Create => creator ??= new Creator(this);
         Publisher? publish;
         public Publisher Publish => publish ??= new Publisher(this);
+        Indexer? index;
+        public Indexer Index => index ??= new Indexer(this);
         Epub? epub;
         public Epub Epub => epub ??= new Epub(this);
 

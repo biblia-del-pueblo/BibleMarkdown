@@ -5,8 +5,6 @@ using System.Text;
 using System.Xml.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
-using System.Security.AccessControl;
 
 namespace BibleMarkdown;
 
