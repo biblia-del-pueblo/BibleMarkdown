@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Text.RegularExpressions;
 using IO = System.IO;
 
 
@@ -31,15 +32,25 @@ namespace BibleMarkdown
                 IO.File.WriteAllText(File, "");
             }
         }
+        bool isExtended = false;
         public void Log(string message)
         {
             if (string.IsNullOrWhiteSpace(message)) return;
-            
-            var line = message + Environment.NewLine;
+
+            if (!Regex.IsMatch(message, @"^\.$|^[0-9.]+\s?%$"))
+            {
+                if (isExtended) message = Environment.NewLine + message + Environment.NewLine;
+                else message += Environment.NewLine;
+                isExtended = false;
+            } else
+            {
+                isExtended = true;
+            }
+
             lock (this)
             {
-                Console.WriteLine(message);
-                if (!string.IsNullOrEmpty(File)) IO.File.AppendAllText(File, line);
+                Console.Write(message);
+                if (!string.IsNullOrEmpty(File)) IO.File.AppendAllText(File, message);
             }
         }
         public void LogFile(string file)

@@ -182,7 +182,7 @@ Options:
         string? projectPath = null, sourcePath = null, outputPath = null;
         if (args.FirstOrDefault() == "publish")
         {
-            if (args.Length >= 2)
+            if (args.Length > 3)
             {
                 Log("Usage: bibmark publish biblesPath wwwPath");
                 return;
@@ -190,7 +190,7 @@ Options:
             sourcePath = args[1];
             var destPath = args[2];
             Transform = new Transform("", sourcePath, destPath);
-            Transform.Publish.Bibles();
+            Transform.Publish.Books();
             return;
         }
 

@@ -13,9 +13,9 @@ namespace BibleMarkdown;
 /// install without downloading it. What the Bibles were converted to (their <c>out</c> folder: PDF, EPUB, HTML ...) is
 /// published too, for people to download.
 /// </summary>
-public class Publisher: WithTransform
+public class Publisher : WithTransform
 {
-    public Publisher(Transform transform): base(transform) { }
+    public Publisher(Transform transform) : base(transform) { }
 
     /// <summary>The name of the file that lists the published Bibles, next to their zips.</summary>
     public const string IndexFileName = "index.json";
@@ -51,7 +51,7 @@ public class Publisher: WithTransform
     /// Every folder of OutputPath, <c>books</c> and <c>out</c> also gets an index.html that lists its content.
     /// </summary>
     /// <returns>The names of the zips of the Bibles, in the order of the index.</returns>
-    public List<string> Bibles()
+    public List<string> Books(bool verbose = false)
     {
         if (!Directory.Exists(SourcePath)) throw new DirectoryNotFoundException($"Directory not found: {SourcePath}");
         var booksPath = Path.Combine(OutputPath, BooksFolder);
@@ -75,8 +75,22 @@ public class Publisher: WithTransform
             }
 
             var name = Path.GetFileName(folder) + ".zip";
+            float prevratio = 0;
+            Action<float> progress = null;
+            if (verbose)
+            {
+                progress = (float ratio) =>
+                {
+                    if (ratio - prevratio > 0.1)
+                    {
+                        prevratio = ratio;
+                        Log($"{(int)(ratio * 100)}%");
+                    }
+                    else Log(".");
+                };
+            }
             ZipFolder(folder, Path.Combine(booksPath, name), SearchOption.AllDirectories,
-                file => !file.Contains('/') || file == "src/script.cs" ? "bibmark/" + file : null);
+                file => !file.Contains('/') || file == "src/script.cs" ? "bibmark/" + file : null, progress);
             Log($"Created {BooksFolder}/{name}");
 
             index.Add(new JObject { ["File"] = name, ["Info"] = ReadInfo(files) });
@@ -179,36 +193,42 @@ public class Publisher: WithTransform
     };
 
     /// <summary>Zips the files (without folders) into <paramref name="zip"/>.</summary>
-    private static void ZipFiles(IEnumerable<string> files, string zip, Func<string, string?>? filter = null) =>
+    private static void ZipFiles(IEnumerable<string> files, string zip, Func<string, string?>? filter = null, Action<float> progress = null) =>
         Zip(files.Select(file => (File: file, Entry: filter?.Invoke(Path.GetFileName(file))))
             .Where(file => file.Entry != null)
-            .OfType<(string File, string Entry)>(), zip);
+            .OfType<(string File, string Entry)>(), zip, progress);
 
     /// <summary>Zips a folder with its subfolders into <paramref name="zip"/>.</summary>
-    private static void ZipFolder(string folder, string zip, SearchOption searchOption = SearchOption.AllDirectories, Func<string, string?>? filter = null) =>
+    private static void ZipFolder(string folder, string zip, SearchOption searchOption = SearchOption.AllDirectories, Func<string, string?>? filter = null, Action<float> progress = null) =>
         Zip(Directory.EnumerateFiles(folder, "*", searchOption)
-            .Select(file => (File:file, Entry: filter?.Invoke(Path.GetRelativePath(folder, file).Replace(Path.DirectorySeparatorChar, '/'))))
+            .Select(file => (File: file, Entry: filter?.Invoke(Path.GetRelativePath(folder, file).Replace(Path.DirectorySeparatorChar, '/'))))
             .Where(file => file.Entry != null)
-            .OfType<(string File, string Entry)>(), zip);
+            .OfType<(string File, string Entry)>(), zip, progress);
 
     // Every entry has the same date and the entries are sorted: the same files give the same zip, byte for byte, so
     // that publishing again does not change a zip (and a git repository that holds the site does not grow with every run).
     private static readonly DateTimeOffset ZipDate = new(2000, 1, 1, 0, 0, 0, TimeSpan.Zero);
 
     /// <summary>Zips the files under the names given; a zip that fails half way does not replace a good one.</summary>
-    private static void Zip(IEnumerable<(string File, string Entry)> files, string zip)
+    private static void Zip(IEnumerable<(string File, string Entry)> files, string zip, Action<float> progress = null)
     {
         var temporary = zip + ".tmp";
         if (File.Exists(temporary)) File.Delete(temporary);
+        var fileslist = files.ToList();
+        var n = fileslist.Count;
+        int i = 0;
         using (var archive = ZipFile.Open(temporary, ZipArchiveMode.Create))
-            foreach (var (file, name) in files.OrderBy(f => f.Entry, StringComparer.Ordinal))
+        {
+            foreach (var (file, name) in fileslist.OrderBy(f => f.Entry, StringComparer.Ordinal))
             {
                 var entry = archive.CreateEntry(name, CompressionLevel.Optimal);
                 entry.LastWriteTime = ZipDate;
                 using var input = File.OpenRead(file);
                 using var output = entry.Open();
                 input.CopyTo(output);
+                progress?.Invoke(((float)i++) / ((float)n));
             }
+        }
         File.Move(temporary, zip, overwrite: true);
     }
 
