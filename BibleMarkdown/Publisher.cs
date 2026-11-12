@@ -100,11 +100,13 @@ public class Publisher : WithTransform
                     else Log(".");
                 };
             }
-            ZipFolder(folder, Path.Combine(booksPath, name), SearchOption.AllDirectories,
+            var zipfile = Path.Combine(booksPath, Uri.EscapeDataString(name));
+            ZipFolder(folder, zipfile, SearchOption.AllDirectories,
                 file => !file.Contains('/') || file == "src/script.cs" ? "bibmark/" + file : null, progress);
             Log($"Created {BooksFolder}/{name}");
 
             names.Add(name);
+            index.Add((File: name, Info: info));
 
             PublishOut(Path.Combine(folder, "out"), Path.Combine(outPath, Path.GetFileName(folder)), Path.GetFileName(folder));
         }
