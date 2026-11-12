@@ -2,12 +2,16 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Linq;
 using System.ComponentModel;
+using System.Globalization;
 using System.IO.Compression;
 using System.Net;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Linq;
 
 namespace BibleMarkdown;
+
 
 /// <summary>
 /// Publishes Bibles on a web server: every Bible (a folder of books, see <see cref="Importer"/>) becomes a zip, and an
@@ -117,14 +121,43 @@ public class Publisher : WithTransform
         return names;
     }
 
-    public void Convers()
+    public bool IncrementalZip(IEnumerable<FileInfo> files, string folder, string zipfile, DateTime fromOn, Func<string, string?>? filter = null, Action<float> progress = null)
     {
-        const string imagesFolder = ".images";
-        var imagesPath = Path.Combine(SourcePath, imagesFolder);
-        var images = Directory.EnumerateFiles(imagesPath, "*.*", SearchOption.AllDirectories);
-        var imagezip = Path.Combine(OutputPath, "covers.zip");
-        ZipFolder(imagesPath, imagezip, SearchOption.AllDirectories);
-        LogFile(imagezip, "Published book covers");
+        var fileslist = files.Where(file => file.LastWriteTimeUtc > fromOn).ToList();
+        if (fileslist.Count == 0) return false;
+        Zip(fileslist
+            .Select(file => (File: file.FullName, Entry: Path.GetRelativePath(folder, file.FullName).Replace(Path.DirectorySeparatorChar, '/')))
+            .Select(file => (File: file.File, Entry: filter != null ? filter?.Invoke(file.Entry) : file.Entry))
+            .Where(file => file.Entry != null)
+            .OfType<(string File, string Entry)>(), zipfile, progress);
+        return true;
+    }
+
+    public void BookCovers()
+    {
+        const string imagesFolder = ".BookCovers";
+
+        var imagesSourcePath = Path.Combine(SourcePath, imagesFolder);
+        var coversPath = Path.Combine(OutputPath, "book-covers");
+        Directory.CreateDirectory(coversPath);
+        var coverzips = new DirectoryInfo(coversPath).EnumerateFiles("*.zip").ToList();
+        var lastpublish = coverzips
+            .Select(info => (DateTime?)info.LastWriteTimeUtc)
+            .Max() ?? DateTime.MinValue;
+
+        var images = new DirectoryInfo(imagesSourcePath).EnumerateFiles("*.*", SearchOption.AllDirectories);
+        var imagezip = Path.Combine(coversPath, $"covers.since.{lastpublish.ToString("yyyy-MM-dd_HH-mm-ss", CultureInfo.InvariantCulture)}.zip");
+
+        var zips = coverzips
+           .Select(zip => zip.Name);
+        if (IncrementalZip(images, imagesSourcePath, imagezip, lastpublish))
+        {
+            zips = zips
+                .Concat([Path.GetFileName(imagezip)]);
+            LogFile(imagezip, "Published book covers");
+        }
+        File.WriteAllText(Path.Combine(coversPath, "index.json"), JsonConvert.SerializeObject(zips));
+
     }
     public void DirectoryListings() => WriteListings(OutputPath);
 

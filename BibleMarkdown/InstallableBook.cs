@@ -5,9 +5,11 @@
 //    BibleReader.Library.InstallableBook, a Bible with the search and the install methods.
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
 #if BibleReader
@@ -49,6 +51,14 @@ public class InstallableBook
         get => field ?? Language;
         set => field = value;
     }
+    [JsonIgnore]
+    public string? Image { get; set; }
+    public string LanguageCode => CultureInfo.GetCultures(CultureTypes.NeutralCultures | CultureTypes.SpecificCultures)
+        .FirstOrDefault(culture =>
+            culture.EnglishName.Contains(LanguageEnglishName) ||
+            culture.NativeName.Contains(Language) ||
+            culture.Name.Contains(Language))?.Name ?? "en";
+
 #if BibleReader
     /// <summary>A verse that matches a search.</summary>
     /// <param name="Position">Where the verse is: its book, chapter and verse.</param>

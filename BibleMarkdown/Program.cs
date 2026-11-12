@@ -191,7 +191,7 @@ Options:
             var destPath = args[2];
             Transform = new Transform("", sourcePath, destPath);
             Transform.Publish.Books();
-            Transform.Publish.Convers();
+            Transform.Publish.BookCovers();
             Transform.Publish.DirectoryListings();
             return;
         }
