@@ -139,8 +139,8 @@ public class Importer: WithTransform
         var srcpath = base.SourcePath;
         var bmpath = Path.Combine(srcpath, "bibmark");
         if (!Directory.Exists(bmpath)) return this;
-        var sources = Directory.EnumerateFiles(bmpath)
-            .Where(file => Regex.IsMatch(Path.GetFileName(file), @".md$|.db$|.json$|.xml$",
+        var sources = Directory.EnumerateFiles(bmpath, "*.*", SearchOption.TopDirectoryOnly)
+            .Where(file => Regex.IsMatch(Path.GetFileName(file), @".md$|.db$|.json$|.xml$|^script.cs$",
                 RegexOptions.Singleline | RegexOptions.IgnoreCase));
         if (sources.Any())
         {
@@ -183,6 +183,9 @@ public class Importer: WithTransform
                     }
                 }
             }
+            // copy script file from source
+            var script = Path.Combine(bmpath, "src", "script.cs");
+            if (File.Exists(script)) File.Copy(script, Path.Combine(SourcePath, "script.cs"), true);
         }
 
         return this;

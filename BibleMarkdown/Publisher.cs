@@ -60,9 +60,12 @@ public class Publisher: WithTransform
 
         var index = new JArray();
         var names = new List<string>();
-        foreach (var folder in Directory.EnumerateDirectories(SourcePath).OrderBy(f => f, StringComparer.OrdinalIgnoreCase))
+        foreach (var folder in Directory.EnumerateDirectories(SourcePath)
+            .OrderBy(f => f, StringComparer.OrdinalIgnoreCase))
         {
-            var files = Directory.EnumerateFiles(folder).OrderBy(f => f, StringComparer.OrdinalIgnoreCase).ToList();
+            var files = Directory.EnumerateFiles(folder, "*.*", SearchOption.AllDirectories)
+                .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
+                .ToList();
             // Only a folder with books is a Bible the reader can read (01-Genesis.md ...); a folder with just a scan
             // or a PDF is not published.
             if (!files.Any(f => IsBook(f)))
@@ -72,7 +75,8 @@ public class Publisher: WithTransform
             }
 
             var name = Path.GetFileName(folder) + ".zip";
-            ZipFiles(files, Path.Combine(booksPath, name), file => "bibmark/" + file);
+            ZipFolder(folder, Path.Combine(booksPath, name), SearchOption.AllDirectories,
+                file => !file.Contains('/') || file == "src/script.cs" ? "bibmark/" + file : null);
             Log($"Created {BooksFolder}/{name}");
 
             index.Add(new JObject { ["File"] = name, ["Info"] = ReadInfo(files) });
