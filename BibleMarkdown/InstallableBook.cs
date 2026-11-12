@@ -36,6 +36,7 @@ public class InstallableBook
     // Bible has these in BibleReader.
     public string? Name { get; set; }
     public string? EnglishName { get; set; }
+    public bool Publish { get; set; }
     public virtual string Origin => GetType().Name;
 #endif
 

@@ -1,9 +1,11 @@
+using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
+using Newtonsoft.Json.Linq;
+using System.ComponentModel;
 using System.IO.Compression;
 using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 
 namespace BibleMarkdown;
 
@@ -58,14 +60,19 @@ public class Publisher : WithTransform
         var outPath = Path.Combine(OutputPath, OutFolder);
         Directory.CreateDirectory(booksPath);
 
-        var index = new JArray();
+        var index = new List<(string File, InstallableBook Info)>();
         var names = new List<string>();
         foreach (var folder in Directory.EnumerateDirectories(SourcePath)
+            .Where(folder => !folder.StartsWith("."))
             .OrderBy(f => f, StringComparer.OrdinalIgnoreCase))
         {
             var files = Directory.EnumerateFiles(folder, "*.*", SearchOption.AllDirectories)
                 .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
                 .ToList();
+
+            var info = ReadInfo(files);
+            if (info == null || !info.Publish) continue;
+            
             // Only a folder with books is a Bible the reader can read (01-Genesis.md ...); a folder with just a scan
             // or a PDF is not published.
             if (!files.Any(f => IsBook(f)))
@@ -93,19 +100,33 @@ public class Publisher : WithTransform
                 file => !file.Contains('/') || file == "src/script.cs" ? "bibmark/" + file : null, progress);
             Log($"Created {BooksFolder}/{name}");
 
-            index.Add(new JObject { ["File"] = name, ["Info"] = ReadInfo(files) });
             names.Add(name);
 
             PublishOut(Path.Combine(folder, "out"), Path.Combine(outPath, Path.GetFileName(folder)), Path.GetFileName(folder));
         }
 
         File.WriteAllText(Path.Combine(booksPath, IndexFileName),
-            index.ToString(Formatting.Indented), new UTF8Encoding(false));
+            JsonConvert.SerializeObject(index, new JsonSerializerSettings()
+            {
+                Converters = [new Newtonsoft.Json.Converters.VersionConverter(), new StringEnumConverter()],
+                Formatting = Formatting.Indented
+            }));
+
         Log($"Created {BooksFolder}/{IndexFileName}, {names.Count} Bibles");
 
-        WriteListings(OutputPath);
         return names;
     }
+
+    public void Convers()
+    {
+        const string imagesFolder = ".images";
+        var imagesPath = Path.Combine(SourcePath, imagesFolder);
+        var images = Directory.EnumerateFiles(imagesPath, "*.*", SearchOption.AllDirectories);
+        var imagezip = Path.Combine(OutputPath, "covers.zip");
+        ZipFolder(imagesPath, imagezip, SearchOption.AllDirectories);
+        LogFile(imagezip, "Published book covers");
+    }
+    public void DirectoryListings() => WriteListings(OutputPath);
 
     /// <summary>Marks an index.html as one made here, so that a page that somebody wrote is never replaced.</summary>
     private const string ListingMarker = "<!-- bibmark directory listing -->";
@@ -276,11 +297,11 @@ public class Publisher : WithTransform
     private static bool IsBook(string file) => Regex.IsMatch(Path.GetFileName(file), "^[0-9.]+-.*?.md$|.db$|.info$|.xml$");
 
     /// <summary>The content of the info.json among the files, or null when there is none or it is not valid JSON.</summary>
-    private JToken? ReadInfo(IEnumerable<string> files)
+    private InstallableBook? ReadInfo(IEnumerable<string> files)
     {
         var info = files.FirstOrDefault(f => string.Equals(Path.GetFileName(f), Importer.InfoFileName, StringComparison.OrdinalIgnoreCase));
         if (info == null) return null;
-        try { return JToken.Parse(File.ReadAllText(info, Encoding.UTF8)); }
+        try { return JsonConvert.DeserializeObject<InstallableBook>(File.ReadAllText(info, Encoding.UTF8)); }
         catch (JsonException ex)
         {
             Log($"{info} is not valid JSON and is left out of the index: {ex.Message}");
