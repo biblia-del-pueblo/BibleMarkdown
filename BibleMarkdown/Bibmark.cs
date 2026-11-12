@@ -12,6 +12,7 @@ namespace BibleMarkdown
         public static Creator Create => Transform.Create;
         public static Publisher Publish => Transform.Publish;
         public static BookList Books => Transform.Books;
+        public static Epub Epub => Transform.Epub;
         public static string Language
         {
             get => Transform.Language;
