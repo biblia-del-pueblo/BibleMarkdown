@@ -124,10 +124,9 @@ public class Publisher : WithTransform
     }
 
     private const string CoverDateFormat = "yyyy-MM-dd_HH-mm-ss";
-    private static readonly Regex CoverZipName = new(@"^covers\.(\d{4}-\d\d-\d\d_\d\d-\d\d-\d\d)\.\.(\d{4}-\d\d-\d\d_\d\d-\d\d-\d\d)\.zip$");
+    private static readonly Regex CoverZipName = new(@"^covers\.upto\.(\d{4}-\d\d-\d\d_\d\d-\d\d-\d\d)\.zip$");
 
-    private static string CoverZipFile(DateTime from, DateTime to) =>
-        $"covers.{from.ToString(CoverDateFormat, CultureInfo.InvariantCulture)}..{to.ToString(CoverDateFormat, CultureInfo.InvariantCulture)}.zip";
+    private static string CoverZipFile(DateTime to) => $"covers.upto.{to.ToString(CoverDateFormat, CultureInfo.InvariantCulture)}.zip";
 
     private static DateTime ParseCoverDate(string text) =>
         DateTime.ParseExact(text, CoverDateFormat, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal);
@@ -161,10 +160,11 @@ public class Publisher : WithTransform
     }
 
     /// <summary>
-    /// Publishes the book covers (Source/.BookCovers) as <c>book-covers/covers.FROM..TO.zip</c> files, each with the covers that
-    /// changed after FROM up to and including TO (UTC, yyyy-MM-dd_HH-mm-ss; the first FROM is 0001-01-01_00-00-00), and lists
-    /// them in <c>book-covers/index.json</c>. The names in the index are all that is kept between publishes: the end of the
-    /// latest zip is the last publish, and a zip that is missing is made again from the files in its range.
+    /// Publishes the book covers (Source/.BookCovers) as <c>book-covers/covers.upto.DATE.zip</c> files (DATE is UTC,
+    /// yyyy-MM-dd_HH-mm-ss), each with the covers that changed after the DATE of the zip before it, up to and including its own
+    /// (the first zip has all that changed up to its DATE), and lists them in <c>book-covers/index.json</c>. The names in the
+    /// index are all that is kept between publishes: the latest DATE is the last publish, and a zip that is missing is made
+    /// again from the files in its range.
     /// </summary>
     public void BookCovers()
     {
@@ -175,14 +175,14 @@ public class Publisher : WithTransform
         Directory.CreateDirectory(coversPath);
         var indexFile = Path.Combine(coversPath, IndexFileName);
 
-        // The ranges of the earlier publishes. Names of another form (covers.since.*) are dropped: the covers are published again.
-        var ranges = new List<(DateTime From, DateTime To)>();
+        // The dates of the earlier publishes. Names of another form (covers.since.*) are dropped: the covers are published again.
+        var dates = new List<DateTime>();
         if (File.Exists(indexFile))
             foreach (var name in JsonConvert.DeserializeObject<List<string>>(File.ReadAllText(indexFile)) ?? [])
                 if (CoverZipName.Match(name) is { Success: true } match)
-                    ranges.Add((ParseCoverDate(match.Groups[1].Value), ParseCoverDate(match.Groups[2].Value)));
-        ranges = ranges.OrderBy(range => range.From).ToList();
-        var lastpublish = ranges.Count > 0 ? ranges.Max(range => range.To) : DateTime.MinValue;
+                    dates.Add(ParseCoverDate(match.Groups[1].Value));
+        dates = dates.Distinct().Order().ToList();
+        var lastpublish = dates.Count > 0 ? dates[^1] : DateTime.MinValue;
 
         var images = Directory.Exists(imagesSourcePath)
             ? new DirectoryInfo(imagesSourcePath).EnumerateFiles("*.*", SearchOption.AllDirectories)
@@ -191,16 +191,19 @@ public class Publisher : WithTransform
 
         // The files changed since the last publish are the newest zip, which ends with the date of their latest one.
         var news = images.Where(image => image.Date > lastpublish).ToList();
-        if (news.Count > 0) ranges.Add((lastpublish, news.Max(image => image.Date)));
+        if (news.Count > 0) dates.Add(news.Max(image => image.Date));
 
         var names = new List<string>();
-        foreach (var (from, to) in ranges)
+        var from = DateTime.MinValue;
+        foreach (var to in dates)
         {
-            var name = CoverZipFile(from, to);
+            var name = CoverZipFile(to);
             names.Add(name);
             var zipfile = Path.Combine(coversPath, name);
+            var before = from;
+            from = to;
             if (File.Exists(zipfile)) continue;
-            var inRange = images.Where(image => image.Date > from && image.Date <= to).ToList();
+            var inRange = images.Where(image => image.Date > before && image.Date <= to).ToList();
             Zip(inRange.Select(image => (File: image.File.FullName,
                 Entry: Path.GetRelativePath(imagesSourcePath, image.File.FullName).Replace(Path.DirectorySeparatorChar, '/'))), zipfile);
             LogFile(zipfile, "Published book covers");
