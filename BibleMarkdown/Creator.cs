@@ -369,7 +369,7 @@ public class Creator: WithTransform
     public async Task ToSWORDAsync(string osisFile, string swordPath, string? versification = null)
     {
         // an explicit argument wins, then the versification that ToVerseStats detected from the text, then the configured one
-        if (versification == null) versification = DetectedVersification ?? SwordVersification;
+        if (versification == null) versification = DetectedVersification ?? SwordVersification ?? "KJV";
         if (!Output.HasFlag(Outputs.Sword)) return;
 
         var osis2mod = Pandoc.Find("osis2mod");
