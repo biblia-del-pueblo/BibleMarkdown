@@ -44,7 +44,7 @@ public class Creator: WithTransform
     public string SwordVersification {
         get => swordVersification ?? DetectedVersification;
         set => swordVersification = value;
-    };
+    }
     /// <summary>The SWORD versification that best fits the verses of the Bible; set by <see cref="ToVerseStats"/>.</summary>
     public string? DetectedVersification { get; private set; }
     public bool TwoLanguage { get; set; } = false;
