@@ -123,18 +123,49 @@ public class Publisher : WithTransform
         return names;
     }
 
-    public bool IncrementalZip(IEnumerable<FileInfo> files, string folder, string zipfile, DateTime fromOn, Func<string, string?>? filter = null, Action<float> progress = null)
+    private const string CoverDateFormat = "yyyy-MM-dd_HH-mm-ss";
+    private static readonly Regex CoverZipName = new(@"^covers\.(\d{4}-\d\d-\d\d_\d\d-\d\d-\d\d)\.\.(\d{4}-\d\d-\d\d_\d\d-\d\d-\d\d)\.zip$");
+
+    private static string CoverZipFile(DateTime from, DateTime to) =>
+        $"covers.{from.ToString(CoverDateFormat, CultureInfo.InvariantCulture)}..{to.ToString(CoverDateFormat, CultureInfo.InvariantCulture)}.zip";
+
+    private static DateTime ParseCoverDate(string text) =>
+        DateTime.ParseExact(text, CoverDateFormat, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal);
+
+    /// <summary>
+    /// The date of a file: that of the last git commit that changed it (the files of a fresh checkout all have the date of the
+    /// checkout, so their last write time says nothing), or its last write time when git cannot tell, rounded down to the second.
+    /// </summary>
+    private static DateTime FileDate(FileInfo file)
     {
-        var fileslist = files.Where(file => file.LastWriteTimeUtc > fromOn).ToList();
-        if (fileslist.Count == 0) return false;
-        Zip(fileslist
-            .Select(file => (File: file.FullName, Entry: Path.GetRelativePath(folder, file.FullName).Replace(Path.DirectorySeparatorChar, '/')))
-            .Select(file => (File: file.File, Entry: filter != null ? filter?.Invoke(file.Entry) : file.Entry))
-            .Where(file => file.Entry != null)
-            .OfType<(string File, string Entry)>(), zipfile, progress);
-        return true;
+        try
+        {
+            var start = new System.Diagnostics.ProcessStartInfo("git")
+            {
+                WorkingDirectory = file.DirectoryName!,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+            };
+            foreach (var arg in new[] { "log", "-1", "--format=%ct", "--", file.Name }) start.ArgumentList.Add(arg);
+            using var process = System.Diagnostics.Process.Start(start)!;
+            var output = process.StandardOutput.ReadToEnd().Trim();
+            process.StandardError.ReadToEnd();
+            process.WaitForExit();
+            if (process.ExitCode == 0 && long.TryParse(output, out var seconds))
+                return DateTimeOffset.FromUnixTimeSeconds(seconds).UtcDateTime;
+        }
+        catch (Exception) { } // no git: the last write time is all there is
+        var time = file.LastWriteTimeUtc;
+        return new DateTime(time.Ticks - time.Ticks % TimeSpan.TicksPerSecond, DateTimeKind.Utc);
     }
 
+    /// <summary>
+    /// Publishes the book covers (Source/.BookCovers) as <c>book-covers/covers.FROM..TO.zip</c> files, each with the covers that
+    /// changed after FROM up to and including TO (UTC, yyyy-MM-dd_HH-mm-ss; the first FROM is 0001-01-01_00-00-00), and lists
+    /// them in <c>book-covers/index.json</c>. The names in the index are all that is kept between publishes: the end of the
+    /// latest zip is the last publish, and a zip that is missing is made again from the files in its range.
+    /// </summary>
     public void BookCovers()
     {
         const string imagesFolder = ".BookCovers";
@@ -142,24 +173,43 @@ public class Publisher : WithTransform
         var imagesSourcePath = Path.Combine(SourcePath, imagesFolder);
         var coversPath = Path.Combine(OutputPath, "book-covers");
         Directory.CreateDirectory(coversPath);
-        var coverzips = new DirectoryInfo(coversPath).EnumerateFiles("*.zip").ToList();
-        var lastpublish = coverzips
-            .Select(info => (DateTime?)info.LastWriteTimeUtc)
-            .Max() ?? DateTime.MinValue;
+        var indexFile = Path.Combine(coversPath, IndexFileName);
 
-        var images = new DirectoryInfo(imagesSourcePath).EnumerateFiles("*.*", SearchOption.AllDirectories);
-        var imagezip = Path.Combine(coversPath, $"covers.since.{lastpublish.ToString("yyyy-MM-dd_HH-mm-ss", CultureInfo.InvariantCulture)}.zip");
+        // The ranges of the earlier publishes. Names of another form (covers.since.*) are dropped: the covers are published again.
+        var ranges = new List<(DateTime From, DateTime To)>();
+        if (File.Exists(indexFile))
+            foreach (var name in JsonConvert.DeserializeObject<List<string>>(File.ReadAllText(indexFile)) ?? [])
+                if (CoverZipName.Match(name) is { Success: true } match)
+                    ranges.Add((ParseCoverDate(match.Groups[1].Value), ParseCoverDate(match.Groups[2].Value)));
+        ranges = ranges.OrderBy(range => range.From).ToList();
+        var lastpublish = ranges.Count > 0 ? ranges.Max(range => range.To) : DateTime.MinValue;
 
-        var zips = coverzips
-           .Select(zip => zip.Name);
-        if (IncrementalZip(images, imagesSourcePath, imagezip, lastpublish))
+        var images = Directory.Exists(imagesSourcePath)
+            ? new DirectoryInfo(imagesSourcePath).EnumerateFiles("*.*", SearchOption.AllDirectories)
+                .Select(file => (File: file, Date: FileDate(file))).ToList()
+            : [];
+
+        // The files changed since the last publish are the newest zip, which ends with the date of their latest one.
+        var news = images.Where(image => image.Date > lastpublish).ToList();
+        if (news.Count > 0) ranges.Add((lastpublish, news.Max(image => image.Date)));
+
+        var names = new List<string>();
+        foreach (var (from, to) in ranges)
         {
-            zips = zips
-                .Concat([Path.GetFileName(imagezip)]);
-            LogFile(imagezip, "Published book covers");
+            var name = CoverZipFile(from, to);
+            names.Add(name);
+            var zipfile = Path.Combine(coversPath, name);
+            if (File.Exists(zipfile)) continue;
+            var inRange = images.Where(image => image.Date > from && image.Date <= to).ToList();
+            Zip(inRange.Select(image => (File: image.File.FullName,
+                Entry: Path.GetRelativePath(imagesSourcePath, image.File.FullName).Replace(Path.DirectorySeparatorChar, '/'))), zipfile);
+            LogFile(zipfile, "Published book covers");
         }
-        File.WriteAllText(Path.Combine(coversPath, "index.json"), JsonConvert.SerializeObject(zips));
 
+        // What the index does not list (zips of an older form too) is not published any more.
+        foreach (var zip in new DirectoryInfo(coversPath).EnumerateFiles("*.zip").Where(zip => !names.Contains(zip.Name)))
+            zip.Delete();
+        File.WriteAllText(indexFile, JsonConvert.SerializeObject(names));
     }
     public void DirectoryListings() => WriteListings(OutputPath);
 
