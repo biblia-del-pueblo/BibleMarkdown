@@ -393,7 +393,7 @@ Options:
         }
         else if (File.Exists(projectPath)) {
             Log($"Transform file {Path.GetFileName(projectPath)}");
-            Transform = new Transform(projectPath, sourcePath, outputPath);
+            Transform = new Transform(Path.GetDirectoryName(projectPath), sourcePath, outputPath);
             Transform.FromSource = fromSource;
             Transform.EachVerseOnNewLine = eachVerseOnNewLine;
             Transform.Language = language;
