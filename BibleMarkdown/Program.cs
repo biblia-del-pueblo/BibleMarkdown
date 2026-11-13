@@ -189,6 +189,7 @@ Options:
             }
             sourcePath = args[1];
             var destPath = args[2];
+            Log($"Publish {sourcePath} to {destPath}");
             Transform = new Transform("", sourcePath, destPath);
             Transform.Publish.Books();
             Transform.Publish.BookCovers();
@@ -260,7 +261,7 @@ Options:
         if (args.Contains("-version") || args.Contains("--version") || args.Contains("-v"))
         {
             Transform = new Transform("");
-            Log($"pandoc version: {Transform.Pandoc.Version.ToString()}");
+            Log($"pandoc version: {Transform.Pandoc.Version?.ToString() ?? "Unknown" }");
             return;
         }
 
@@ -372,6 +373,7 @@ Options:
 
         if (Directory.Exists(projectPath))
         {
+            Log($"Transform path {Path.GetFileName(projectPath)}");
             Transform = new Transform(projectPath, sourcePath, outputPath);
             Transform.FromSource = fromSource;
             Transform.EachVerseOnNewLine = eachVerseOnNewLine;
@@ -390,6 +392,7 @@ Options:
             }
         }
         else if (File.Exists(projectPath)) {
+            Log($"Transform file {Path.GetFileName(projectPath)}");
             Transform = new Transform(projectPath, sourcePath, outputPath);
             Transform.FromSource = fromSource;
             Transform.EachVerseOnNewLine = eachVerseOnNewLine;

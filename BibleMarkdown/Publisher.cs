@@ -175,7 +175,7 @@ public class Publisher : WithTransform
         Directory.CreateDirectory(coversPath);
         var indexFile = Path.Combine(coversPath, IndexFileName);
 
-        // The dates of the earlier publishes. Names of another form (covers.since.*) are dropped: the covers are published again.
+        // The dates of the earlier publishes.
         var dates = new List<DateTime>();
         if (File.Exists(indexFile))
             foreach (var name in JsonConvert.DeserializeObject<List<string>>(File.ReadAllText(indexFile)) ?? [])
