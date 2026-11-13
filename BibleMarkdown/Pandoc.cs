@@ -20,7 +20,7 @@ public class Pandoc: WithTransform
         if (arch == Architecture.X86) arch = Architecture.X64;
         var archstr = arch.ToString().ToLower();
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) SetPandocPath(@"runtimes\win\pandoc.exe");
-        else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) SetPandocPath($"rutimes/linux-{archstr}/pandoc");
+        else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) SetPandocPath($"runtimes/linux-{archstr}/pandoc");
         else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) SetPandocPath($"runtimes/osx-{archstr}/pandoc");
         else throw new PlatformNotSupportedException();
 	}
