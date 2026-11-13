@@ -261,6 +261,7 @@ public class Importer: WithTransform
                     if (book2 == null)
                     {
                         var idm = Regex.Match(src, @"\\id\s+(?<id>[A-Za-z0-9]{3})");
+                        var bookbyid = books.FirstOrDefault(b => b.Number == id);
                         int idno = idm.Success ? Array.IndexOf(UsfmBookIds, idm.Groups["id"].Value.ToUpperInvariant()) + 1 : 0;
                         if (idno > 0) book2 = books.FirstOrDefault(b => b.Number == idno);
                     }
