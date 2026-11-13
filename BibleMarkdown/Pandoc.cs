@@ -75,7 +75,7 @@ public class Pandoc: WithTransform
 		{
 			PandocPath = pandocPath;
 			version = Version;
-			if (version != null && version < PackagedVersion)
+			if (version != null && version <= PackagedVersion)
 			{
 				pandocPath = null; // use internal pandoc
 			}
