@@ -147,6 +147,15 @@ public class  Outline: List<OutlineItem>
         {
             srctext = Regex.Replace(srctext, @"(?<=^|\n)##+.*?\r?\n", "", RegexOptions.Singleline); // remove titles
         }
+        else if (Append && bookItem.Items.OfType<TitleItem>().Any())
+        {
+            // Appending an outline must not duplicate titles that the text already has (e.g. titles imported from the usfm
+            // that titles.outline.md lists again): drop the titles of the text that the outline inserts again below.
+            static string NormTitle(string s) => Regex.Replace(s, @"\s+", " ").Trim();
+            var outlineTitles = bookItem.Items.OfType<TitleItem>().Select(t => NormTitle(t.Title)).ToHashSet();
+            srctext = Regex.Replace(srctext, @"(?<=^|\n)##+[ \t]*(?<title>[^\r\n]*)\r?\n",
+                m => outlineTitles.Contains(NormTitle(m.Groups["title"].Value)) ? "" : m.Value, RegexOptions.Singleline);
+        }
         // src = Regex.Replace(src, @"(\s*\^[a-zA-Z]+\^)|(([ \t]*\^[a-zA-Z]+\^\[[^\]]*\])+([ \t]*\r?\n)?)", "", RegexOptions.Singleline); // remove footnotes
         srctext = Regex.Replace(srctext, @"//!verse-paragraphs.*?(\r?\n|$)", "", RegexOptions.Singleline); // remove verse paragraphs
 
