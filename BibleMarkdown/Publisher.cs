@@ -204,9 +204,12 @@ public class Publisher : WithTransform
             from = to;
             if (File.Exists(zipfile)) continue;
             var inRange = images.Where(image => image.Date > before && image.Date <= to).ToList();
-            Zip(inRange.Select(image => (File: image.File.FullName,
+            if (inRange.Count > 0)
+            {
+                Zip(inRange.Select(image => (File: image.File.FullName,
                 Entry: Path.GetRelativePath(imagesSourcePath, image.File.FullName).Replace(Path.DirectorySeparatorChar, '/'))), zipfile);
-            LogFile(zipfile, "Published book covers");
+                LogFile(zipfile, "Published book covers");
+            }
         }
 
         // What the index does not list (zips of an older form too) is not published any more.
