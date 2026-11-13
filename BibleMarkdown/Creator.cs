@@ -196,6 +196,8 @@ public class Creator: WithTransform
 		text = Regex.Replace(text, @"\^\[([^\]]*)\]", @"\footnote{$1}", RegexOptions.Singleline);
 		*/
 
+        text = Regex.Replace(text, @"(\r?\n)([ \t]*\r?\n){2,}", "$1$1", RegexOptions.Singleline); // never more than one empty line
+
         var usfmpanfile = Path.Combine(Path.GetDirectoryName(panfile), "usfm", Path.GetFileName(panfile));
 
         File.WriteAllText(usfmpanfile, text);
