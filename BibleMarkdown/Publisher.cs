@@ -123,10 +123,10 @@ public class Publisher : WithTransform
         return names;
     }
 
-    private const string CoverDateFormat = "yyyy-MM-dd_HH-mm-ss";
-    private static readonly Regex CoverZipName = new(@"^covers\.upto\.(\d{4}-\d\d-\d\d_\d\d-\d\d-\d\d)\.zip$");
+    public const string CoverDateFormat = "yyyy-MM-dd_HH-mm-ss";
+    public static readonly Regex CoverZipName = new(@"^covers\.upto\.(?<time>\d{4}-\d\d-\d\d_\d\d-\d\d-\d\d)\.zip$");
 
-    private static string CoverZipFile(DateTime to) => $"covers.upto.{to.ToString(CoverDateFormat, CultureInfo.InvariantCulture)}.zip";
+    public static string CoverZipFile(DateTime to) => $"covers.upto.{to.ToString(CoverDateFormat, CultureInfo.InvariantCulture)}.zip";
 
     public static DateTime ParseCoverDate(string text) =>
         DateTime.ParseExact(text, CoverDateFormat, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal);
@@ -180,7 +180,7 @@ public class Publisher : WithTransform
         if (File.Exists(indexFile))
             foreach (var name in JsonConvert.DeserializeObject<List<string>>(File.ReadAllText(indexFile)) ?? [])
                 if (CoverZipName.Match(name) is { Success: true } match)
-                    dates.Add(ParseCoverDate(match.Groups[1].Value));
+                    dates.Add(ParseCoverDate(match.Groups["time"].Value));
         dates = dates.Distinct().Order().ToList();
         var lastpublish = dates.Count > 0 ? dates[^1] : DateTime.MinValue;
 
