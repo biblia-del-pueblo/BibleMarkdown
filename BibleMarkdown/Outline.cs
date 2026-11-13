@@ -156,6 +156,15 @@ public class  Outline: List<OutlineItem>
             srctext = Regex.Replace(srctext, @"(?<=^|\n)##+[ \t]*(?<title>[^\r\n]*)\r?\n",
                 m => outlineTitles.Contains(NormTitle(m.Groups["title"].Value)) ? "" : m.Value, RegexOptions.Singleline);
         }
+        if (Append && bookItem.Items.OfType<FootnoteItem>().Any())
+        {
+            // Same for footnotes: appending an outline must not duplicate footnotes that the text already has. Drop the
+            // (plain ^[...]) footnotes of the text that the outline inserts again below.
+            static string NormNote(string s) => Regex.Replace(s, @"\s+", " ").Trim();
+            var outlineNotes = bookItem.Items.OfType<FootnoteItem>().Select(f => NormNote(f.Footnote)).ToHashSet();
+            srctext = Regex.Replace(srctext, @"[ \t]*(?<!\^[a-zA-Z]+)\^\[(?>\[(?<c>)|[^\[\]]+|\](?<-c>))*(?(c)(?!))\]",
+                m => outlineNotes.Contains(NormNote(m.Value)) ? "" : m.Value, RegexOptions.Singleline);
+        }
         // src = Regex.Replace(src, @"(\s*\^[a-zA-Z]+\^)|(([ \t]*\^[a-zA-Z]+\^\[[^\]]*\])+([ \t]*\r?\n)?)", "", RegexOptions.Singleline); // remove footnotes
         srctext = Regex.Replace(srctext, @"//!verse-paragraphs.*?(\r?\n|$)", "", RegexOptions.Singleline); // remove verse paragraphs
 
@@ -253,6 +262,9 @@ public class  Outline: List<OutlineItem>
             markno++;
         }
 
+        // never more than one empty line (an appended outline can add a paragraph break where the text already has one)
+        srctext = Regex.Replace(srctext, @"(\r?\n)([ \t]*\r?\n){2,}", "$1$1", RegexOptions.Singleline);
+
         return srctext;
     }
 
@@ -346,10 +358,10 @@ public class  Outline: List<OutlineItem>
                         {
                             Verse = verse,
                             Class = match.Groups["paragraph"].Success ?
-                                    OutlineItemClass.Paragraph : match.Groups["footnotes"].Success ?
+                                    OutlineItemClass.Paragraph : match.Groups["footnote"].Success ?
                                         OutlineItemClass.Footnote : match.Groups["title"].Success ?
                                         OutlineItemClass.Title : OutlineItemClass.Verse,
-                            Footnote = match.Groups["footnotes"].Success ? match.Groups["footnotes"].Value : "",
+                            Footnote = match.Groups["footnote"].Success ? match.Groups["footnote"].Value : "",
                             Title = match.Groups["title"].Success ? match.Groups["title"].Value : ""
                         };
                     });
@@ -637,7 +649,7 @@ public class  Outline: List<OutlineItem>
                 title.Add(new XAttribute("Verse", item.Verse));
                 if (chapterxml != null) chapterxml.Add(title);
                 else Log("Error: No chapter for outline.");
-                result.AppendLine($"{Environment.NewLine}###{titleItem.Title}");
+                result.AppendLine($"{Environment.NewLine}### {titleItem.Title}");
             }
             else if (item is FootnoteItem)
             {
