@@ -206,6 +206,17 @@ public class Importer: WithTransform
         return this;
     }
 
+    // The usfm book ids in the order of the book numbers 1..66.
+    static readonly string[] UsfmBookIds = {
+        "GEN", "EXO", "LEV", "NUM", "DEU", "JOS", "JDG", "RUT", "1SA", "2SA", "1KI", "2KI", "1CH", "2CH", "EZR", "NEH", "EST",
+        "JOB", "PSA", "PRO", "ECC", "SNG", "ISA", "JER", "LAM", "EZK", "DAN", "HOS", "JOL", "AMO", "OBA", "JON", "MIC", "NAM",
+        "HAB", "ZEP", "HAG", "ZEC", "MAL", "MAT", "MRK", "LUK", "JHN", "ACT", "ROM", "1CO", "2CO", "GAL", "EPH", "PHP", "COL",
+        "1TH", "2TH", "1TI", "2TI", "TIT", "PHM", "HEB", "JAS", "1PE", "2PE", "1JN", "2JN", "3JN", "JUD", "REV" };
+
+    // lower case, umlauts transliterated, only letters and digits: "1. Mose" == "1 MOSE", "Sprüche" == "SPRUECHE"
+    string NormalizeBookName(string name) =>
+        Regex.Replace(name.ToLower(BookList.Culture(Language)).Replace("ä", "ae").Replace("ö", "oe").Replace("ü", "ue").Replace("ß", "ss"), @"[^\p{L}\p{N}]", "");
+
     public Importer FromUSFM()
     {
         if (Disabled || !Directory.Exists(SourcePath)) return this;
@@ -243,7 +254,21 @@ public class Importer: WithTransform
 
                 if (useNames)
                 {
-                    var book2 = books.FirstOrDefault(b => bookm.Any(bm => b.Name == bm));
+                    var book2 = books.FirstOrDefault(b => bookm.Any(bm => BookList.SameName(Language, b.Name, bm)));
+                    // The names in the usfm are often in capitals or transliterated (1 MOSE, SPRUECHE, ROEMERS), so they do
+                    // not equal the names in booknames.xml. Find the book by its usfm \id code (GEN, EXO ...), then by the
+                    // normalized name, to get the number and the name of booknames.xml.
+                    if (book2 == null)
+                    {
+                        var idm = Regex.Match(src, @"\\id\s+(?<id>[A-Za-z0-9]{3})");
+                        int idno = idm.Success ? Array.IndexOf(UsfmBookIds, idm.Groups["id"].Value.ToUpperInvariant()) + 1 : 0;
+                        if (idno > 0) book2 = books.FirstOrDefault(b => b.Number == idno);
+                    }
+                    if (book2 == null)
+                    {
+                        var normalized = bookm.Select(NormalizeBookName).ToArray();
+                        book2 = books.FirstOrDefault(b => normalized.Contains(NormalizeBookName(b.Name)));
+                    }
                     if (book2 != null)
                     {
                         book = book2.Name;
