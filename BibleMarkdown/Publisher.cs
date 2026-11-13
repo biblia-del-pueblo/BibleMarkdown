@@ -41,6 +41,12 @@ public class Publisher : WithTransform
     /// <summary>The folders of an out folder that are not published at all.</summary>
     public static readonly string[] SkippedOutFolders = { "pandoc" };
 
+    public class IndexEntry
+    {
+        public string File { get; set; }
+        public InstallableBook Info { get; set; }
+    }
+
     /// <summary>
     /// Publishes the Bibles, the folders in SourcePath, into OutputPath:
     /// <list type="bullet">
@@ -64,7 +70,7 @@ public class Publisher : WithTransform
         var outPath = Path.Combine(OutputPath, OutFolder);
         Directory.CreateDirectory(booksPath);
 
-        var index = new List<(string File, InstallableBook Info)>();
+        var index = new List<IndexEntry>();
         var names = new List<string>();
         foreach (var folder in Directory.EnumerateDirectories(SourcePath)
             .Where(folder => !folder.StartsWith("."))
@@ -106,7 +112,7 @@ public class Publisher : WithTransform
             Log($"Created {BooksFolder}/{name}");
 
             names.Add(name);
-            index.Add((File: name, Info: info));
+            index.Add(new IndexEntry() { File = name, Info = info });
 
             PublishOut(Path.Combine(folder, "out"), Path.Combine(outPath, Path.GetFileName(folder)), Path.GetFileName(folder));
         }
