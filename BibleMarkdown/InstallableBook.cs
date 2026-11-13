@@ -56,13 +56,34 @@ public class InstallableBook
     public string? Image { get; set; }
 
     string? languageCode = null;
-    public string LanguageCode => languageCode ??=
-        Regex.IsMatch(Language, @"^[a-z]{2,3}(?:-[A-Z]{2,3})?$") ? Language :
-            CultureInfo.GetCultures(CultureTypes.NeutralCultures | CultureTypes.SpecificCultures)
-                .FirstOrDefault(culture =>
-                    culture.EnglishName.Contains(LanguageEnglishName) ||
-                    culture.NativeName.Contains(Language) ||
-                    culture.Name.Contains(Language))?.Name!;
+    public string LanguageCode
+    {
+        get => languageCode ??=
+            Regex.IsMatch(Language, @"^[a-z]{2,3}(?:-[A-Z]{2,3})?$") ? Language :
+                CultureInfo.GetCultures(CultureTypes.NeutralCultures | CultureTypes.SpecificCultures)
+                    .FirstOrDefault(culture =>
+                        culture.EnglishName.Contains(LanguageEnglishName) ||
+                        culture.NativeName.Contains(Language) ||
+                        culture.Name.Contains(Language))?.Name!;
+        set => languageCode = value;
+    }
+
+    public InstallableBook() { }
+    public InstallableBook(InstallableBook source)
+    {
+        Class = source.Class;
+        CountryCode = source.CountryCode;
+        CountryName = source.CountryName;
+        EnglishName = source.EnglishName;
+        Image = source.Image;
+        Language = source.Language;
+        languageCode = source.languageCode;
+        LanguageEnglishName = source.LanguageEnglishName;
+#if BibleReader
+        Books = source.Books;
+        HasStrongs = source.HasStrongs;
+#endif
+    }
 
 #if BibleReader
     /// <summary>A verse that matches a search.</summary>
@@ -119,7 +140,7 @@ public class InstallableBook
     public virtual async Task Install() { }
     public virtual async Task Uninstall()
     {
-        if (Directory.Exists(ConfigPath)) Directory.Delete(ConfigPath);
+        if (Directory.Exists(ConfigPath)) Directory.Delete(ConfigPath, true);
     }
 #endif
 }
