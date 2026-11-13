@@ -261,9 +261,14 @@ public class Importer: WithTransform
                     if (book2 == null)
                     {
                         var idm = Regex.Match(src, @"\\id\s+(?<id>[A-Za-z0-9]{3})");
-                        var bookbyid = books.FirstOrDefault(b => b.Number == id);
-                        int idno = idm.Success ? Array.IndexOf(UsfmBookIds, idm.Groups["id"].Value.ToUpperInvariant()) + 1 : 0;
-                        if (idno > 0) book2 = books.FirstOrDefault(b => b.Number == idno);
+                        string? id = idm.Success ? idm.Groups["id"].Value : null;
+                        var bookbyid = books.FirstOrDefault(b => b.Abbreviation.Equals(id, StringComparison.OrdinalIgnoreCase));
+                        if (bookbyid != null) book2 = bookbyid;
+                        else
+                        {
+                            int idno =id != null ? Array.IndexOf(UsfmBookIds, id.ToUpperInvariant()) + 1 : 0;
+                            if (idno > 0) book2 = books.FirstOrDefault(b => b.Number == idno);
+                        }
                     }
                     if (book2 == null)
                     {
