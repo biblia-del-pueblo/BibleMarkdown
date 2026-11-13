@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Globalization;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -18,10 +19,34 @@ public class Book
 
 public class BookList : SortedList<string?, SortedList<string?, Book>>
 {
+	/// <summary>The culture of a language of booknames.xml ("german", "spanish2" ...), invariant if there is none.</summary>
+	public static CultureInfo Culture(string? language)
+	{
+		var name = Regex.Replace(language ?? "", "[0-9]", "");
+		if (name == "" || name == "default") return CultureInfo.InvariantCulture;
+		return CultureInfo.GetCultures(CultureTypes.NeutralCultures)
+			.FirstOrDefault(c => c.EnglishName.StartsWith(name, StringComparison.OrdinalIgnoreCase) ||
+				c.NativeName.StartsWith(name, StringComparison.OrdinalIgnoreCase) ||
+				c.Name.Equals(name, StringComparison.OrdinalIgnoreCase)) ?? CultureInfo.InvariantCulture;
+	}
+
+	/// <summary>
+	/// Compares book names of a language case independent, by the rules of the culture of the language (the Turkish
+	/// dotless i, the German umlauts ...): the book names in usfm files are often in capitals.
+	/// </summary>
+	public static StringComparer NameComparer(string? language)
+	{
+		var culture = Culture(language);
+		return culture == CultureInfo.InvariantCulture ? StringComparer.InvariantCultureIgnoreCase : StringComparer.Create(culture, ignoreCase: true);
+	}
+
+	/// <summary>Whether two book names of a language are the same, ignoring case.</summary>
+	public static bool SameName(string? language, string? a, string? b) => NameComparer(language).Equals(a, b);
+
 	Transform Transform { get; set; }
-	public BookList(Transform transform) {
+	public BookList(Transform transform): base(StringComparer.InvariantCultureIgnoreCase) {
 		Transform = transform;
-		Add("default", new SortedList<string?, Book>());
+		Add("default", new SortedList<string?, Book>(NameComparer("default")));
     }
 	string Language
 	{
@@ -102,7 +127,7 @@ public class BookList : SortedList<string?, SortedList<string?, Book>>
 
 		foreach (var lang in languages)
 		{
-			var books = new SortedList<string, Book>();
+			var books = new SortedList<string?, Book>(NameComparer(lang.Language));
 			Add(lang.Language, books);
 			foreach (var book in lang.Books)
 			{
@@ -115,7 +140,7 @@ public class BookList : SortedList<string?, SortedList<string?, Book>>
 
 	public BookList Load(IEnumerable<string> mdfiles)
 	{
-		if (!ContainsKey("default")) Add("default", new SortedList<string, Book>());
+		if (!ContainsKey("default")) Add("default", new SortedList<string?, Book>(NameComparer("default")));
 		
 		var books = this["default"];
 
