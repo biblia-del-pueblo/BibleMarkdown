@@ -180,11 +180,10 @@ public class Creator: WithTransform
         // text = Regex.Replace(text, @"^(# .*?)$\n^(## .*?)$", "$2\n$1", RegexOptions.Multiline); // titles
         text = Regex.Replace(text, @"\^\^", "^"); // alternative for superscript
         text = Regex.Replace(text, @"(?<!<[^\n<>]*?)""(.*?)""(?![^\n<>]>)", $"“$1”"); // replace quotation mark with nicer letters
-                                                                                      //text = Regex.Replace(text, @"\^([0-9]+)\^", "[$1]{.bibleverse}"); // replace bibleverses with bibleverse span.
         text = Regex.Replace(text, @"([\u0590-\u05fe]+)", "[$1]{.hebrew}");
         text = Regex.Replace(text, @"([\u0370-\u03ff\u1f00-\u1fff]+)", "[$1]{.greek}");
-        text = Regex.Replace(text, @"\^([0-9]+)\^", "[$1]{.bibleverse}");
-        text = Regex.Replace(text, @"@([0-9]+)", "[$1]{.bibleverse}");
+        text = Regex.Replace(text, @"\^([0-9]+)\^", "[$1]{.bibleverse}"); // replace bibleverses with bibleverse span.
+        text = Regex.Replace(text, @"@([0-9]+)", "[$1]{.bibleverse}"); // replace bibleverses with bibleverse span.
 
         /*
 		text = Regex.Replace(text, @" ^# (.*?)$", @"\chapter{$1}", RegexOptions.Multiline);
@@ -416,7 +415,8 @@ public class Creator: WithTransform
         //src = Regex.Replace(src, @"^(# .*?)$\n^(## .*?)$", "$2\n$1", RegexOptions.Multiline); // titles
         // Text has bible verses, so insert a \sectionnumber. (The @N and ^N^ verse markup was already turned into \bibleverse{N}
         // above, so that is what has to be looked for here; looking for @N never matched and no \sectionnumber was written.)
-        if (Regex.IsMatch(src, @"\\bibleverse\{[0-9]+\}", RegexOptions.Singleline))
+        bool isBible = Regex.IsMatch(src, @"\A(?=[\s\S]*\\bibleverse\{\d+\})(?![\s\S]*^#[ \t]+(?!\d+[ \t]*\r?$))", RegexOptions.Multiline);
+        if (isBible)
         {
             src = Regex.Replace(src, @"((^|\n)(# [0-9]+\s*)(\r?\n\s*)+((## .*?)(\r?\n\s*)+)?)", @"$1\sectionnumber ",
                 RegexOptions.Singleline); // Chapternumber
