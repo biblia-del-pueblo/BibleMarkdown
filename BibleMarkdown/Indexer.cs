@@ -15,10 +15,11 @@ namespace BibleMarkdown
         /// <see cref="WordIndex.Search"/>.
         /// </summary>
         /// <returns>The number of words in the index.</returns>
-        public int Create()
+        /// <param name="culture">The culture (such as "he") whose rules compare the words; see <see cref="WordIndex.Create"/>.</param>
+        public int Create(string? culture = null)
         {
             Log("Create the word index");
-            var indexSize = WordIndex.Create(ProjectPath);
+            var indexSize = WordIndex.Create(ProjectPath, culture);
             LogFile(Path.Combine(ProjectPath, WordIndex.FileName), $"Created, {indexSize} words,");
             return indexSize;
         }

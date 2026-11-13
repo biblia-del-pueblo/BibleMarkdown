@@ -10,6 +10,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 #if BibleReader
@@ -53,11 +54,15 @@ public class InstallableBook
     }
     [JsonIgnore]
     public string? Image { get; set; }
-    public string LanguageCode => CultureInfo.GetCultures(CultureTypes.NeutralCultures | CultureTypes.SpecificCultures)
-        .FirstOrDefault(culture =>
-            culture.EnglishName.Contains(LanguageEnglishName) ||
-            culture.NativeName.Contains(Language) ||
-            culture.Name.Contains(Language))?.Name ?? "en";
+
+    string? languageCode = null;
+    public string LanguageCode => languageCode ??=
+        Regex.IsMatch(Language, @"^[a-z]{2,3}(?:-[A-Z]{2,3})?$") ? Language :
+            CultureInfo.GetCultures(CultureTypes.NeutralCultures | CultureTypes.SpecificCultures)
+                .FirstOrDefault(culture =>
+                    culture.EnglishName.Contains(LanguageEnglishName) ||
+                    culture.NativeName.Contains(Language) ||
+                    culture.Name.Contains(Language))?.Name!;
 
 #if BibleReader
     /// <summary>A verse that matches a search.</summary>
@@ -81,7 +86,7 @@ public class InstallableBook
 
         return await Task.Run(() =>
         {
-            if (!BibleMarkdown.WordIndex.IsCurrent(indexFile)) new BibleMarkdown.Transform(ConfigPath).Index.Create();
+            if (!BibleMarkdown.WordIndex.IsCurrent(indexFile)) new BibleMarkdown.Transform(ConfigPath).Index.Create(LanguageCode);
             var hits = BibleMarkdown.WordIndex.Search(indexFile, terms, limit);
 
             // the books are those of the folder; their verses are read once for every book that has a hit

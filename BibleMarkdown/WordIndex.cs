@@ -190,17 +190,27 @@ public static class WordIndex
     /// database <see cref="FileName"/> in the same folder; an existing one is replaced.
     /// </summary>
     /// <returns>The number of words in the index.</returns>
-    public static int Create(string mdpath)
+    /// <param name="culture">The name of the culture (such as "he" or "de-CH") whose rules compare the words in the database; the
+    /// invariant culture if null or unknown. It is kept in the file, so the index is read the same on every machine.</param>
+    public static int Create(string mdpath, string? culture = null)
     {
         var file = Path.Combine(mdpath, FileName);
         if (File.Exists(file)) File.Delete(file);
 
-        using var database = new LiteDatabase(new ConnectionString { Filename = file, Connection = ConnectionType.Direct });
+        using var database = new LiteDatabase(new ConnectionString
+        {
+            Filename = file,
+            Connection = ConnectionType.Direct,
+            Collation = new Collation(GetCulture(culture).LCID, CompareOptions.IgnoreCase)
+        });
         var words = database.GetCollection<WordEntry>(Collection);
         int count = 0;
 
         // The places of every word are collected over all the books, then written: one entry for every word.
-        var places = new Dictionary<string, List<WordPlace>>(StringComparer.Ordinal);
+        // They are compared as the unique _id index of the database compares them (its collation), or two words that the
+        // index sees as one (such as the final and the regular kaf of Hebrew) would be inserted twice.
+        var places = new Dictionary<string, List<WordPlace>>(
+            database.Collation.Culture.CompareInfo.GetStringComparer(database.Collation.SortOptions));
 
         var books = Directory.EnumerateFiles(mdpath, "*.md")
             .Where(f => Regex.IsMatch(Path.GetFileName(f), @"^[0-9]+[0-9.]*-"))
@@ -226,6 +236,12 @@ public static class WordIndex
 
         words.InsertBulk(places.Select(p => new WordEntry { Word = p.Key, Places = WordPlace.Encode(p.Value) }), 2000);
         return count;
+    }
+
+    static CultureInfo GetCulture(string? name)
+    {
+        try { return string.IsNullOrWhiteSpace(name) ? CultureInfo.InvariantCulture : CultureInfo.GetCultureInfo(name); }
+        catch (CultureNotFoundException) { return CultureInfo.InvariantCulture; }
     }
 
     /// <summary>Whether the file is an index in the format that <see cref="Search"/> reads (an index of an older format is made again).</summary>
