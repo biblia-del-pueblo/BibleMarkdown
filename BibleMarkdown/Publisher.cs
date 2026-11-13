@@ -128,7 +128,7 @@ public class Publisher : WithTransform
 
     private static string CoverZipFile(DateTime to) => $"covers.upto.{to.ToString(CoverDateFormat, CultureInfo.InvariantCulture)}.zip";
 
-    private static DateTime ParseCoverDate(string text) =>
+    public static DateTime ParseCoverDate(string text) =>
         DateTime.ParseExact(text, CoverDateFormat, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal);
 
     /// <summary>
