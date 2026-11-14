@@ -321,7 +321,7 @@ public class Importer: WithTransform
                     return res;
                 });
 
-                if (ParagraphVerses) src = Regex.Replace(src, @"\\v\s+([0-9]+)", "@$1"); // verse numbers
+                if (ParagraphVerses) src = Regex.Replace(src, @"\\v\s+([0-9]+)", "@$1 "); // verse numbers, always followed by a space (Hebrew USFM may have "\v 1\w ..."); multiple spaces are collapsed below
                 else src = Regex.Replace(src, @"\\v\s+([0-9]+)", "^$1^"); // verse numbers
 
                 // footnotes
