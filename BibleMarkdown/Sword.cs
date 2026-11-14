@@ -894,23 +894,46 @@ public static class SwordMarkup
 		return result;
 	}
 
-	/// <summary>The words with their Strong numbers and morphology as the import of USFM writes them: word_&amp;lemma_H1234_%morph.</summary>
+	static readonly Regex SimpleWordRx = new(@"^[\p{L}\p{M} ]+$", RegexOptions.Compiled);
+	static readonly Regex StrongNumberRx = new(@"^[GH][0-9]+$", RegexOptions.Compiled);
+
+	/// <summary>
+	/// The word with its Strong numbers, lemma and morphology as the import of USFM writes them: a simple word with
+	/// one Strong number as word_G1234 (spaces of the word as _), otherwise as [word]{strong="G1234" lemma="..." x-morph="..."}.
+	/// </summary>
 	static string WithStrongs(string word, Dictionary<string, string> attrs)
 	{
-		var tokens = new List<string>(word.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
-		var lemma = attrs.GetValueOrDefault("lemma", "");
-		if (lemma.Length == 0 && !attrs.ContainsKey("morph")) return word;
-		foreach (var entry in lemma.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+		var strongs = new List<string>();
+		var lemmas = new List<string>();
+		foreach (var entry in attrs.GetValueOrDefault("lemma", "").Split(' ', StringSplitOptions.RemoveEmptyEntries))
 		{
 			var colon = entry.IndexOf(':');
 			var kind = colon < 0 ? "strong" : entry[..colon].ToLowerInvariant();
 			var value = colon < 0 ? entry : entry[(colon + 1)..];
-			if (kind == "lemma") tokens.Add("&" + value);
-			else if (kind == "strong") tokens.Add(value);
+			if (kind == "lemma") lemmas.Add(value);
+			else if (kind == "strong") strongs.Add(value);
 		}
-		foreach (var entry in attrs.GetValueOrDefault("morph", "").Split(' ', StringSplitOptions.RemoveEmptyEntries))
-			tokens.Add("%" + entry[(entry.IndexOf(':') + 1)..]);
-		return string.Join('_', tokens);
+		var morphs = attrs.GetValueOrDefault("morph", "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
+		if (strongs.Count == 0 && lemmas.Count == 0 && morphs.Length == 0) return word;
+
+		var text = word.Trim();
+		if (text.Length == 0) return word;
+		var lead = word[..(word.Length - word.TrimStart().Length)];
+		var trail = word[word.TrimEnd().Length..];
+		if (strongs.Count == 1 && lemmas.Count == 0 && morphs.Length == 0 &&
+			StrongNumberRx.IsMatch(strongs[0]) && SimpleWordRx.IsMatch(text))
+			return lead + text.Replace(' ', '_') + "_" + strongs[0] + trail;
+
+		var parameters = new StringBuilder();
+		void Add(string key, IEnumerable<string> values, string separator)
+		{
+			var joined = string.Join(separator, values);
+			if (joined.Length > 0) parameters.Append(parameters.Length > 0 ? " " : "").Append(key).Append("=\"").Append(joined.Replace("\"", "'")).Append('"');
+		}
+		Add("strong", strongs, ",");
+		Add("lemma", lemmas, " ");
+		Add("x-morph", morphs, " ");
+		return $"{lead}[{text}]{{{parameters}}}{trail}";
 	}
 
 	static string QuoteMark(int depth) => depth % 2 == 1 ? "“" : "‘";

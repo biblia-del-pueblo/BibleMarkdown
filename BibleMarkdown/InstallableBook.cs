@@ -1,26 +1,27 @@
 // This file is the one source of InstallableBook for two projects:
 //  - BibleMarkdown compiles it as BibleMarkdown.InstallableBook, only the data that is stored in an info.json
 //    (see Importer.ReadInfo);
-//  - BibleReader.Library links it (BibleReader.Library.csproj) and defines BibleReader: it is then
-//    BibleReader.Library.InstallableBook, a Bible with the search and the install methods.
+//  - CrossBible.Library links it (CrossBible.Library.csproj) and defines CrossBible: it is then
+//    CrossBible.Library.InstallableBook, a Bible with the search and the install methods.
 using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Text;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
-#if BibleReader
-namespace BibleReader.Library;
+#if CrossBible
+namespace CrossBible.Library;
 #else
 namespace BibleMarkdown;
 #endif
 
 public class InstallableBook
-#if BibleReader
+#if CrossBible
     : BookText
 #endif
 {
@@ -35,8 +36,8 @@ public class InstallableBook
         AddOn
     }
 
-#if !BibleReader
-    // Bible has these in BibleReader.
+#if !CrossBible
+    // Bible has these in CrossBible.
     public string? Name { get; set; }
     public string? EnglishName { get; set; }
     public bool Publish { get; set; }
@@ -56,36 +57,41 @@ public class InstallableBook
     public string? Image { get; set; }
 
     string? languageCode = null;
+
+    // Looking a language up goes through all the cultures of the system (several hundred): once for a language, not for every one of its (thousand) Bibles.
+    static readonly System.Collections.Concurrent.ConcurrentDictionary<(string, string), string?> LanguageCodes = new();
+
     public string LanguageCode
     {
         get => languageCode ??=
             Regex.IsMatch(Language, @"^[a-z]{2,3}(?:-[A-Z]{2,3})?$") ? Language :
-                CultureInfo.GetCultures(CultureTypes.NeutralCultures | CultureTypes.SpecificCultures)
-                    .FirstOrDefault(culture =>
-                        culture.EnglishName.Contains(LanguageEnglishName) ||
-                        culture.NativeName.Contains(Language) ||
-                        culture.Name.Contains(Language))?.Name!;
+                LanguageCodes.GetOrAdd((Language, LanguageEnglishName), key =>
+                    CultureInfo.GetCultures(CultureTypes.NeutralCultures | CultureTypes.SpecificCultures)
+                        .FirstOrDefault(culture =>
+                            culture.EnglishName.Contains(key.Item2) ||
+                            culture.NativeName.Contains(key.Item1) ||
+                            culture.Name.Contains(key.Item1))?.Name)!;
         set => languageCode = value;
     }
-
     public InstallableBook() { }
     public InstallableBook(InstallableBook source)
     {
         Class = source.Class;
         CountryCode = source.CountryCode;
         CountryName = source.CountryName;
+        Name = source.Name;
         EnglishName = source.EnglishName;
         Image = source.Image;
         Language = source.Language;
         languageCode = source.languageCode;
         LanguageEnglishName = source.LanguageEnglishName;
-#if BibleReader
+#if CrossBible
         Books = source.Books;
         HasStrongs = source.HasStrongs;
 #endif
     }
 
-#if BibleReader
+#if CrossBible
     /// <summary>A verse that matches a search.</summary>
     /// <param name="Position">Where the verse is: its book, chapter and verse.</param>
     /// <param name="Score">The match score: the number of different searched words in the verse, plus half a point for every two of them that stand next to each other as in the search phrase.</param>

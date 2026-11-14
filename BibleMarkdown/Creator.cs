@@ -2,6 +2,7 @@
 using Microsoft.CodeAnalysis;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.Data;
 using System.Formats.Tar;
 using System.Globalization;
@@ -20,12 +21,12 @@ namespace BibleMarkdown;
 [Flags]
 public enum Outputs { Pandoc = 1, Html = 2, TeX = 4, Epub = 8, USFM = 0x10, OSIS = 0x20, Sword = 0x40, All = 0xFFFF, None = 0 };
 
-public class Creator: WithTransform
+public class Creator : WithTransform
 {
-    public Creator(Transform transform): base(transform) { }
+    public Creator(Transform transform) : base(transform) { }
     public Outputs Output { get; set; } = Outputs.All;
     Outline? outline;
-    public Outline Outline => outline ??= new Outline(Transform); 
+    public Outline Outline => outline ??= new Outline(Transform);
     public string LanguageCode
     {
         get
@@ -41,7 +42,8 @@ public class Creator: WithTransform
         }
     }
     string? swordVersification;
-    public string SwordVersification {
+    public string SwordVersification
+    {
         get => swordVersification ?? DetectedVersification;
         set => swordVersification = value;
     }
@@ -81,42 +83,25 @@ public class Creator: WithTransform
     public DateTime BibmarkTime => Transform.BibmarkTime;
     public bool IsNewer(string file, string srcfile) => Transform.IsNewer(file, srcfile);
 
+    const string StrongAttibutes = @"(\s*?(?:z-|x-)?(strongs|morph|lemma)="".*?"")+\s*";
+    const string StrongËxtendedWord = @"\[(?<content>(?:[^\[\]]+|(?<open>\[)|(?<-open>\]))*(?(open)(?!)))\]\{(?<attr>" + StrongAttibutes + @")\}";
     public string CleanStrongs(string text)
     {
-        text = Regex.Replace(text, @"(?<=[\p{L}\p{M}]+)_(?=(?![GH][0-9]+|&[\p{L}\p{M}]+|%[0-9a-zA-Z-]+)[\p{L}\p{M}]+)", " ");
-        text = Regex.Replace(text, @"(?<=[&%-0-9\p{L}\p{M}]+)_([GH][0-9]+|&[\p{L}\p{M}]+|%[0-9a-zA-Z-]+)", "");
+        text = Regex.Replace(text, @"(?<=[\p{L}\p{M}])_(?=(?![GH][0-9]+)[\p{L}\p{M}]+)", " ");
+        text = Regex.Replace(text, @"(?<=[\p{L}\p{M}])_(?:[GH][0-9]+)", "");
+        text = Regex.Replace(text, StrongËxtendedWord, "${content}");
         return text;
     }
-
     public string UsfmStrongs(string text)
     {
-        return Regex.Replace(text, @"[\p{L}\p{M}]+(_[%&\p{Nd}\p{L}\p{M}-]+)+", match =>
+        text = Regex.Replace(text, @"(?<word>[\p{L}\p{M}]+(?:_[\p{L}\p{M}]+)*)_(?<strong>[GH][0-9]+)", match =>
         {
-            var word = match.Value;
-            if (Regex.IsMatch(word, @"_[GH][0-9]+|_&[\p{L}\p{M}]+|_%[0-9a-zA-Z-]+"))
-            {
-                var wordOnly = Regex.Replace(word, @"_[GH][0-9]+|_&[\p{L}\p{M}]+|_%[0-9a-zA-Z-]+", "").Replace('_', ' ');
-                var strong = Regex.Matches(word, @"(?<=_)[GH][0-9]+");
-                var lemma = Regex.Match(word, @"(?<=_&)[\p{L}\p{M}]+");
-                var morph = Regex.Match(word, @"(?<=_%)[0-9a-zA-Z-]+");
-
-                var param = new StringBuilder();
-                if (lemma.Success) param.Append($"lemma=\"{lemma.Value}\"");
-                if (strong.Count > 0)
-                {
-                    if (param.Length > 0) param.Append(' ');
-                    param.Append($"strong=\"{string.Join(' ', strong)}\"");
-                }
-                if (morph.Success)
-                {
-                    if (param.Length > 0) param.Append(' ');
-                    param.Append($"morph=\"{morph.Value}\"");
-                }
-
-                return $"\\w {wordOnly}|{param}\\w*";
-            }
-            else return word;
-        });
+            var wordOnly = match.Groups["word"].Value.Replace('_', ' ');
+            var strong = match.Groups["strong"].Value;
+            return $@"\w {wordOnly}| strong=""{strong}"" \w*";
+        }, RegexOptions.Singleline);
+        text = Regex.Replace(text, StrongËxtendedWord, @"\w ${content}| ${attr} \w*", RegexOptions.Singleline);
+        return text;
     }
 
     public void ToPandoc(string file, string panfile)
@@ -127,7 +112,7 @@ public class Creator: WithTransform
         var text = File.ReadAllText(file);
 
         text = Outline.Apply(text, file);
-        
+
         string? bookname = Books.Name(file);
         int bookno = Books.Number(file);
 
@@ -186,14 +171,14 @@ public class Creator: WithTransform
         text = Regex.Replace(text, @"@([0-9]+)", "[$1]{.bibleverse}"); // replace bibleverses with bibleverse span.
 
         /*
-		text = Regex.Replace(text, @" ^# (.*?)$", @"\chapter{$1}", RegexOptions.Multiline);
-		text = Regex.Replace(text, @"^## (.*?)$", @"\section{$1}", RegexOptions.Multiline);
-		text = Regex.Replace(text, @"^### (.*?)$", @"\subsection{$1}", RegexOptions.Multiline);
-		text = Regex.Replace(text, @"^#### (.*)$", @"\subsubsection{$1}", RegexOptions.Multiline);
-		text = Regex.Replace(text, @"\*\*(.*?)(?=\*\*)", @"\bfseries{$1}");
-		text = Regex.Replace(text, @"\*([^*]*)\*", @"\emph{$1}", RegexOptions.Singleline); 
-		text = Regex.Replace(text, @"\^\[([^\]]*)\]", @"\footnote{$1}", RegexOptions.Singleline);
-		*/
+        text = Regex.Replace(text, @" ^# (.*?)$", @"\chapter{$1}", RegexOptions.Multiline);
+        text = Regex.Replace(text, @"^## (.*?)$", @"\section{$1}", RegexOptions.Multiline);
+        text = Regex.Replace(text, @"^### (.*?)$", @"\subsection{$1}", RegexOptions.Multiline);
+        text = Regex.Replace(text, @"^#### (.*)$", @"\subsubsection{$1}", RegexOptions.Multiline);
+        text = Regex.Replace(text, @"\*\*(.*?)(?=\*\*)", @"\bfseries{$1}");
+        text = Regex.Replace(text, @"\*([^*]*)\*", @"\emph{$1}", RegexOptions.Singleline); 
+        text = Regex.Replace(text, @"\^\[([^\]]*)\]", @"\footnote{$1}", RegexOptions.Singleline);
+        */
 
         text = Regex.Replace(text, @"(\r?\n)([ \t]*\r?\n){2,}", "$1$1", RegexOptions.Singleline); // never more than one empty line
 
@@ -249,7 +234,7 @@ public class Creator: WithTransform
             // remove comments
             text = Regex.Replace(text, @"/\*.*?\*/", "", RegexOptions.Singleline); // comments
             text = Regex.Replace(text, @"(?<!:)//.*?\r?\n", "", RegexOptions.Multiline); // single line comments
-            // resolve footnotes
+                                                                                         // resolve footnotes
             bool replaced;
             do
             {
@@ -414,9 +399,9 @@ public class Creator: WithTransform
         src = Regex.Replace(src, @"\[([\u0590-\u05fe]+)\]\{\.hebrew\}", @"\hebrew{$1}");
         src = Regex.Replace(src, @"\[([\u0370-\u03ff\u1f00-\u1fff]+)\]\{\.greek\}", @"\greek{$1}");
         src = Regex.Replace(src, @"\[((?>\[(?<depth>)|\](?<-depth>)|[^\[\]]+)*)\](?(depth)(?!)){.wj\}", @"\wordsOfJesus{$1}"); // words of Jesus
-        //src = Regex.Replace(src, @"^(# .*?)$\n^(## .*?)$", "$2\n$1", RegexOptions.Multiline); // titles
-        // Text has bible verses, so insert a \sectionnumber. (The @N and ^N^ verse markup was already turned into \bibleverse{N}
-        // above, so that is what has to be looked for here; looking for @N never matched and no \sectionnumber was written.)
+                                                                                                                               //src = Regex.Replace(src, @"^(# .*?)$\n^(## .*?)$", "$2\n$1", RegexOptions.Multiline); // titles
+                                                                                                                               // Text has bible verses, so insert a \sectionnumber. (The @N and ^N^ verse markup was already turned into \bibleverse{N}
+                                                                                                                               // above, so that is what has to be looked for here; looking for @N never matched and no \sectionnumber was written.)
         bool isBible = Regex.IsMatch(src, @"\A(?=[\s\S]*\\bibleverse\{\d+\})(?![\s\S]*^#[ \t]+(?!\d+[ \t]*\r?$))", RegexOptions.Multiline);
         if (isBible)
         {
@@ -469,7 +454,7 @@ public class Creator: WithTransform
         var path = ProjectPath;
 
         Log("Create Two Langauge...");
-        
+
         Books.Load();
 
         var leftfiles = Directory.EnumerateFiles(leftpath, "*.md")

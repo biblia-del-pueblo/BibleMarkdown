@@ -347,28 +347,24 @@ public class Importer: WithTransform
 
                 if (ImportStrongs)
                 {
-                    src = Regex.Replace(src, @"\\w(.*?)\\w\*", m =>
+                    src = Regex.Replace(src, @"\\w\s(.*?)\\w\*", m =>
                     {
                         var word = m.Groups[1].Value;
-                        var param = Regex.Match(word, @"(.*?)\|(.*)");
+                        var param = Regex.Match(word, @"(.*?)\|(.*)", RegexOptions.Singleline);
                         if (param.Success)
                         {
                             word = param.Groups[1].Value;
-                            var p = $" {param.Groups[2].Value}";
+                            var p = param.Groups[2].Value;
 
-                            var strongs = Regex.Matches(p, @" strong\s*=\s*""(\s*[A-Z][0-9]+)+\s*""")
-                                .SelectMany(m => m.Groups[1].Value.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
-                            var morph = Regex.Match(p, @" morph\s*=\s*""([^""]+)""");
-                            var lemma = Regex.Match(p, @" lemma\s*=\s*""([^""]+)""");
-
-                            var tokens = new List<string>();
-
-                            tokens.AddRange(word.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
-                            if (lemma.Success) tokens.Add($"&{lemma.Groups[1].Value}");
-                            tokens.AddRange(strongs);
-                            if (morph.Success) tokens.Add($"%{morph.Groups[1].Value}");
-
-                            return string.Join('_', tokens);
+                            var isSimpleWord = Regex.IsMatch(word, @"^[\p{L}\p{M} ]+$");
+                            var simplePar = Regex.Match(p, @"^\s*strong\s*=\s*""\s*(?<number>[GH][0-9]+)\s*""\s*$", RegexOptions.Singleline);
+                            if (isSimpleWord && simplePar.Success)
+                            {
+                                return $"{word.Replace(' ', '_')}_{simplePar.Groups["number"].Value}";
+                            } else
+                            {
+                                return $"[{word}]{{{p}}}";
+                            }
                         }
                         return m.Value;
                     }, RegexOptions.Singleline);

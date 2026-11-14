@@ -1,4 +1,5 @@
 using LiteDB;
+using System.ComponentModel;
 using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -125,17 +126,20 @@ public static class WordIndex
     // ---- Words ---------------------------------------------------------------------------------------
 
     // What is in the markdown of a verse that is not a word: footnotes and their markers, the "{.wj}" of a style, the
-    // address of a link. A word with Strong's attributes ("beginning_H7225_&lemma") is one token with its attributes.
+    // address of a link. A word with a Strong's number ("beginning_H7225", the spaces of a phrase are "_") is one token
+    // with its number; a word with more attributes ("[beginning]{strong="H7225" lemma="..." x-morph="..."}", a space after "{" is optional) is one
+    // token with the words in the brackets and without the attributes.
     const string Balanced = @"(?>\[(?<c>)|[^\[\]]+|\](?<-c>))*(?(c)(?!))";
     static readonly Regex TokenRx = new(
         @"\^\[" + Balanced + @"\]" +                                   // a footnote: not part of the verse
         @"|\^[a-zA-Z]+\^" +                                            // the marker of a footnote
         @"|\{\.[a-zA-Z]+\}" +                                          // {.wj}, {.smallcaps}
         @"|(?<=\])\([a-zA-Z]+://[^)\s]*\)" +                           // the address of a link
-        @"|(?<token>[\p{L}\p{M}\p{Nd}]+(?:_[%&\p{Nd}\p{L}\p{M}-]+)*)", // a word, or a word with attributes
+        @"|(?<token>\[(?<spantext>[^\[\]]+)\]\{\s*[a-zA-Z-]+\s*=\s*""[^""]*""(?:\s+[a-zA-Z-]+\s*=\s*""[^""]*"")*\s*\})" + // a word with attributes
+        @"|(?<token>[\p{L}\p{M}\p{Nd}]+(?:_[\p{Nd}\p{L}\p{M}]+)*)",   // a word, or a word with its Strong's number
         RegexOptions.Compiled);
 
-    static readonly Regex StrongsAttribute = new(@"^(?:[GH][0-9]+|&.+|%[0-9a-zA-Z-]+)$", RegexOptions.Compiled);
+    static readonly Regex StrongsAttribute = new(@"^[GH][0-9]+$", RegexOptions.Compiled);
 
     /// <summary>A word of a text and where it is: for a word with Strong's attributes the whole token (a phrase has several words).</summary>
     public readonly record struct Token(int Start, int Length, string[] Words);
@@ -148,7 +152,8 @@ public static class WordIndex
         {
             var token = m.Groups["token"];
             if (!token.Success) continue;
-            var words = token.Value.Split('_')
+            var spanText = m.Groups["spantext"];
+            var words = (spanText.Success ? new[] { spanText.Value } : token.Value.Split('_'))
                 .Where((part, i) => i == 0 || !StrongsAttribute.IsMatch(part)) // the first part is always a word
                 .SelectMany(part => Regex.Matches(part, @"[\p{L}\p{M}\p{Nd}]+").Select(w => Normalize(w.Value)))
                 .Where(w => w.Length > 0)
@@ -194,6 +199,10 @@ public static class WordIndex
     /// invariant culture if null or unknown. It is kept in the file, so the index is read the same on every machine.</param>
     public static int Create(string mdpath, string? culture = null)
     {
+        // fallback for ancient hebrew & ancient greek
+        if (culture == "hbo") culture = "he";
+        else if (culture == "grc") culture = "el";
+
         var file = Path.Combine(mdpath, FileName);
         if (File.Exists(file)) File.Delete(file);
 
