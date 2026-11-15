@@ -83,13 +83,14 @@ public class Creator : WithTransform
     public DateTime BibmarkTime => Transform.BibmarkTime;
     public bool IsNewer(string file, string srcfile) => Transform.IsNewer(file, srcfile);
 
-    const string StrongAttibutes = @"(\s*?(?:z-|x-)?(strongs|morph|lemma)="".*?"")+\s*";
-    const string StrongËxtendedWord = @"\[(?<content>(?:[^\[\]]+|(?<open>\[)|(?<-open>\]))*(?(open)(?!)))\]\{(?<attr>" + StrongAttibutes + @")\}";
+    const string StrongAttibutes = @"(\s*(?:z-|x-)?(?:strongs|morph|lemma)=""[^""]*"")+\s*";
+    const string StrongËxtendedWord = @"\[(?<content>(?>[^\[\]]+|(?<open>\[)|(?<-open>\]))*(?(open)(?!)))\]\{(?<attr>" + StrongAttibutes + @")\}";
     public string CleanStrongs(string text)
     {
         text = Regex.Replace(text, @"(?<=[\p{L}\p{M}])_(?=(?![GH][0-9]+)[\p{L}\p{M}]+)", " ");
         text = Regex.Replace(text, @"(?<=[\p{L}\p{M}])_(?:[GH][0-9]+)", "");
-        text = Regex.Replace(text, StrongËxtendedWord, "${content}");
+        if (text.Contains("]{"))
+            text = Regex.Replace(text, StrongËxtendedWord, "${content}");
         return text;
     }
     public string UsfmStrongs(string text)
