@@ -61,12 +61,15 @@ public class InstallableBook
     // Looking a language up goes through all the cultures of the system (several hundred): once for a language, not for every one of its (thousand) Bibles.
     static readonly System.Collections.Concurrent.ConcurrentDictionary<(string, string), string?> LanguageCodes = new();
 
+    static CultureInfo[] cultures;
+    static CultureInfo[] Cultures => cultures ??= CultureInfo.GetCultures(CultureTypes.NeutralCultures | CultureTypes.SpecificCultures);
+
     public string LanguageCode
     {
         get => languageCode ??=
             Regex.IsMatch(Language, @"^[a-z]{2,3}(?:-[A-Z]{2,3})?$") ? Language :
                 LanguageCodes.GetOrAdd((Language, LanguageEnglishName), key =>
-                    CultureInfo.GetCultures(CultureTypes.NeutralCultures | CultureTypes.SpecificCultures)
+                    Cultures
                         .FirstOrDefault(culture =>
                             culture.EnglishName.Contains(key.Item2) ||
                             culture.NativeName.Contains(key.Item1) ||
