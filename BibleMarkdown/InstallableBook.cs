@@ -48,8 +48,8 @@ public class InstallableBook
 
     public string CountryCode { get; set; }
     public string CountryName { get; set; }
-    public string Language { get; set; }
-    public string LanguageEnglishName {
+    public virtual string Language { get; set; }
+    public virtual string LanguageEnglishName {
         get => field ?? Language;
         set => field = value;
     }
@@ -62,9 +62,9 @@ public class InstallableBook
     static readonly System.Collections.Concurrent.ConcurrentDictionary<(string, string), string?> LanguageCodes = new();
 
     static CultureInfo[] cultures;
-    static CultureInfo[] Cultures => cultures ??= CultureInfo.GetCultures(CultureTypes.NeutralCultures | CultureTypes.SpecificCultures);
+    public static CultureInfo[] Cultures => cultures ??= CultureInfo.GetCultures(CultureTypes.NeutralCultures | CultureTypes.SpecificCultures);
 
-    public string LanguageCode
+    public virtual string LanguageCode
     {
         get => languageCode ??=
             Regex.IsMatch(Language, @"^[a-z]{2,3}(?:-[A-Z]{2,3})?$") ? Language :
@@ -76,7 +76,9 @@ public class InstallableBook
                             culture.Name.Contains(key.Item1))?.Name)!;
         set => languageCode = value;
     }
+    public virtual InstallableBook Upgrade() => this;
     public InstallableBook() { }
+
     public InstallableBook(InstallableBook source)
     {
         Class = source.Class;
@@ -143,6 +145,17 @@ public class InstallableBook
                 results.Add(new SearchResult(new VersePosition { Book = book, Chapter = hit.Chapter, Verse = hit.Verse }, hit.Score, markdown));
             }
             return results;
+        });
+    }
+
+    /// <summary>The words of the Bible that start with <paramref name="fragment"/>, with how many times each occurs (see <see cref="BibleMarkdown.WordIndex.WordsContaining"/>).</summary>
+    public async Task<List<(string Word, int Count)>> WordsContaining(string fragment, int limit = 50)
+    {
+        var indexFile = Path.Combine(ConfigPath, BibleMarkdown.WordIndex.FileName);
+        return await Task.Run(() =>
+        {
+            if (!BibleMarkdown.WordIndex.IsCurrent(indexFile)) new BibleMarkdown.Transform(ConfigPath).Index.Create(LanguageCode);
+            return BibleMarkdown.WordIndex.WordsContaining(indexFile, fragment, limit);
         });
     }
 

@@ -316,6 +316,38 @@ public static class WordIndex
         return (limit > 0 ? hits.Take(limit) : hits).ToList();
     }
 
+    // The words of an index with the number of times each occurs, kept per index file: reading and counting every entry takes a
+    // moment, and a search box asks for it at every key press.
+    static readonly Dictionary<string, (DateTime Written, List<(string Word, int Count)> Words)> WordCache = new();
+
+    /// <summary>
+    /// The words of the index that start with <paramref name="fragment"/> (as <see cref="Normalize"/> makes it), with how many times each
+    /// occurs in the Bible; the most frequent first, then alphabetically.
+    /// </summary>
+    /// <param name="limit">The most words to return (0 for all).</param>
+    public static List<(string Word, int Count)> WordsContaining(string indexFile, string fragment, int limit = 50)
+    {
+        fragment = Normalize(fragment);
+        if (fragment.Length == 0 || !File.Exists(indexFile)) return new();
+
+        List<(string Word, int Count)> all;
+        var written = File.GetLastWriteTimeUtc(indexFile);
+        lock (WordCache)
+        {
+            if (!WordCache.TryGetValue(indexFile, out var cached) || cached.Written != written)
+            {
+                using var database = new LiteDatabase(new ConnectionString { Filename = indexFile, Connection = ConnectionType.Direct, ReadOnly = true });
+                var list = database.GetCollection<WordEntry>(Collection).FindAll()
+                    .Select(e => (e.Word, WordPlace.Decode(e.Places).Count())).ToList();
+                WordCache[indexFile] = cached = (written, list);
+            }
+            all = cached.Words;
+        }
+        var found = all.Where(w => w.Word.StartsWith(fragment, StringComparison.Ordinal))
+            .OrderByDescending(w => w.Count).ThenBy(w => w.Word, StringComparer.Ordinal);
+        return (limit > 0 ? found.Take(limit) : found).ToList();
+    }
+
     // About the number of verses of a Bible; it only has to be near, as it is used to see how common a word is.
     const double TotalVerses = 31000;
 

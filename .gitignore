@@ -11,6 +11,7 @@
 **/out/epub/
 NugetApiKey.txt
 nuget-apikey.txt
+[Bb]in/
 
 
 # User-specific files
