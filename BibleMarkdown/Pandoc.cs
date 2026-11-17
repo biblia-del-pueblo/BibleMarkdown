@@ -69,7 +69,8 @@ public class Pandoc: WithTransform
 
 	void SetPandocPath(string exe) 
 	{
-		var pandocPath = Find("pandoc");
+		var pandocInPath = Find("pandoc");
+        var pandocPath = pandocInPath;
 		Version? version = null;
 		if (pandocPath != null)
 		{
@@ -84,6 +85,11 @@ public class Pandoc: WithTransform
 		{
 			var exepath = AppDomain.CurrentDomain.BaseDirectory;
 			PandocPath = pandocPath = Path.Combine(exepath, exe);
+			if (!File.Exists(pandocPath) && pandocInPath != null)
+			{
+				PandocPath = pandocPath = pandocInPath;
+				return;
+			}
 			if (!IsWindows && PandocPath.Contains(Path.DirectorySeparatorChar)) Process.Start("chmod", $"+x \"{PandocPath}\"").WaitForExit();
 			// Set PATH to pandoc
 			var userenv = Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.User) ?? "";

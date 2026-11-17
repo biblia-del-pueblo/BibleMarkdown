@@ -71,17 +71,11 @@
 
 
     <ItemGroup Condition="$(PackAsTool) == 'true'">
-        <None Update="runtimes\**\*.*" Pack="True" PackagePath="/tools/net11.0/any">
+        <None Update="runtimes\**\*.*" Pack="True" PackagePath="/tools/net11.0/any/runtimes">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>
     </ItemGroup>
     
-    <ItemGroup Condition="$(PackAsTool) != 'true'">
-        <None Update="runtimes\**\*.*" Pack="True" PackagePath="/lib/net11.0">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-        </None>
-    </ItemGroup>
-
     <!--<Target Name="IncludeReadmeInPackage" AfterTargets="Build">
         <Copy
           SourceFiles="..\README.md"
