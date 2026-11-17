@@ -128,8 +128,16 @@ namespace BibleMarkdown
             {
                 if (bibmarktime == null)
                 {
-                    var exe = Assembly.GetExecutingAssembly().Location;
-                    bibmarktime = File.GetLastWriteTimeUtc(exe);
+                    // When the program was made: the last write of bibmark.dll or bibmark.exe (the name of the assembly) in the folder of the application. The location of
+                    // the assembly is not asked (it is empty for an assembly in a single file or compiled ahead of time). When neither file is there, because the code is
+                    // compiled into the executable of an application, that is the file.
+                    var name = typeof(Transform).Assembly.GetName().Name ?? "bibmark";
+                    var times = new[] { ".dll", ".exe", "" }
+                        .Select(extension => Path.Combine(AppContext.BaseDirectory, name + extension))
+                        .Where(File.Exists)
+                        .Select(File.GetLastWriteTimeUtc)
+                        .ToList();
+                    bibmarktime = times.Count > 0 ? times.Max() : File.GetLastWriteTimeUtc(Environment.ProcessPath ?? AppContext.BaseDirectory);
                 }
                 return bibmarktime.Value;
             }

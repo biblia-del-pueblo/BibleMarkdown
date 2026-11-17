@@ -81,17 +81,6 @@ public readonly record struct WordPlace(int Book, int Chapter, int Verse, int Po
     }
 }
 
-/// <summary>A word of a Bible, with all the places where it is.</summary>
-public sealed class WordEntry
-{
-    /// <summary>The word as <see cref="WordIndex.Normalize"/> makes it: in lower case and without accents. It is the id of the entry.</summary>
-    [BsonId]
-    public string Word { get; set; } = "";
-
-    /// <summary>The places of the word (book, chapter, verse and position in the verse) as bytes; <see cref="WordPlace.Decode"/> reads them.</summary>
-    public byte[] Places { get; set; } = Array.Empty<byte>();
-}
-
 /// <summary>A verse that has some of the searched words, with its match score (higher is better).</summary>
 public sealed record WordHit(int Book, int Chapter, int Verse, double Score);
 
@@ -212,7 +201,8 @@ public static class WordIndex
             Connection = ConnectionType.Direct,
             Collation = new Collation(GetCulture(culture).LCID, CompareOptions.IgnoreCase)
         });
-        var words = database.GetCollection<WordEntry>(Collection);
+        // The entries are documents (see StrongsDatabase): the word, normalized, is the _id, and Places has its places as bytes.
+        var words = database.GetCollection(Collection);
         int count = 0;
 
         // The places of every word are collected over all the books, then written: one entry for every word.
@@ -243,7 +233,7 @@ public static class WordIndex
             }
         }
 
-        words.InsertBulk(places.Select(p => new WordEntry { Word = p.Key, Places = WordPlace.Encode(p.Value) }), 2000);
+        words.InsertBulk(places.Select(p => new BsonDocument { ["_id"] = p.Key, ["Places"] = WordPlace.Encode(p.Value) }), 2000);
         return count;
     }
 
@@ -279,7 +269,7 @@ public static class WordIndex
         if (terms.Count == 0 || !File.Exists(indexFile)) return new List<WordHit>();
 
         using var database = new LiteDatabase(new ConnectionString { Filename = indexFile, Connection = ConnectionType.Direct, ReadOnly = true });
-        var words = database.GetCollection<WordEntry>(Collection);
+        var words = database.GetCollection(Collection);
 
         // for every verse: where the searched words are in it (the index of the word in the phrase and its place in the verse)
         var verses = new Dictionary<(int Book, int Chapter, int Verse), List<(int Term, int Position)>>();
@@ -289,7 +279,7 @@ public static class WordIndex
             if (words.FindById(terms[term]) is not { } entry) continue; // the word is not in the Bible
             int verseCount = 0; // in how many verses the word is: the places are in the order of the Bible, so a verse is one run
             (int, int, int) previous = default;
-            foreach (var place in WordPlace.Decode(entry.Places))
+            foreach (var place in WordPlace.Decode(entry["Places"].AsBinary))
             {
                 var key = (place.Book, place.Chapter, place.Verse);
                 if (verseCount == 0 || key != previous) verseCount++;
@@ -337,8 +327,8 @@ public static class WordIndex
             if (!WordCache.TryGetValue(indexFile, out var cached) || cached.Written != written)
             {
                 using var database = new LiteDatabase(new ConnectionString { Filename = indexFile, Connection = ConnectionType.Direct, ReadOnly = true });
-                var list = database.GetCollection<WordEntry>(Collection).FindAll()
-                    .Select(e => (e.Word, WordPlace.Decode(e.Places).Count())).ToList();
+                var list = database.GetCollection(Collection).FindAll()
+                    .Select(e => (e["_id"].AsString, WordPlace.Decode(e["Places"].AsBinary).Count())).ToList();
                 WordCache[indexFile] = cached = (written, list);
             }
             all = cached.Words;

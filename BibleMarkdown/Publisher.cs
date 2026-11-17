@@ -1,6 +1,4 @@
-using Newtonsoft.Json;
-using Newtonsoft.Json.Converters;
-using Newtonsoft.Json.Linq;
+using System.Text.Json;
 using System.ComponentModel;
 using System.Globalization;
 using System.IO.Compression;
@@ -118,11 +116,7 @@ public class Publisher : WithTransform
         }
 
         File.WriteAllText(Path.Combine(booksPath, IndexFileName),
-            JsonConvert.SerializeObject(index, new JsonSerializerSettings()
-            {
-                Converters = [new Newtonsoft.Json.Converters.VersionConverter(), new StringEnumConverter()],
-                Formatting = Formatting.Indented
-            }));
+            JsonSerializer.Serialize(index, JsonContext.Indented.ListIndexEntry));
 
         Log($"Created {BooksFolder}/{IndexFileName}, {names.Count} Bibles");
 
@@ -184,7 +178,7 @@ public class Publisher : WithTransform
         // The dates of the earlier publishes.
         var dates = new List<DateTime>();
         if (File.Exists(indexFile))
-            foreach (var name in JsonConvert.DeserializeObject<List<string>>(File.ReadAllText(indexFile)) ?? [])
+            foreach (var name in JsonSerializer.Deserialize(File.ReadAllText(indexFile), JsonContext.Plain.ListString) ?? [])
                 if (CoverZipName.Match(name) is { Success: true } match)
                     dates.Add(ParseCoverDate(match.Groups["time"].Value));
         dates = dates.Distinct().Order().ToList();
@@ -221,7 +215,7 @@ public class Publisher : WithTransform
         // What the index does not list (zips of an older form too) is not published any more.
         foreach (var zip in new DirectoryInfo(coversPath).EnumerateFiles("*.zip").Where(zip => !names.Contains(zip.Name)))
             zip.Delete();
-        File.WriteAllText(indexFile, JsonConvert.SerializeObject(names));
+        File.WriteAllText(indexFile, JsonSerializer.Serialize(names, JsonContext.Plain.ListString));
     }
     public void DirectoryListings() => WriteListings(OutputPath);
 
@@ -398,7 +392,7 @@ public class Publisher : WithTransform
     {
         var info = files.FirstOrDefault(f => string.Equals(Path.GetFileName(f), Importer.InfoFileName, StringComparison.OrdinalIgnoreCase));
         if (info == null) return null;
-        try { return JsonConvert.DeserializeObject<InstallableBook>(File.ReadAllText(info, Encoding.UTF8)); }
+        try { return JsonSerializer.Deserialize(File.ReadAllText(info, Encoding.UTF8), JsonContext.Plain.InstallableBook); }
         catch (JsonException ex)
         {
             Log($"{info} is not valid JSON and is left out of the index: {ex.Message}");

@@ -25,6 +25,8 @@ public class InstallableBook
     : BookText
 #endif
 {
+    // Its name when it is written, its name or its number when it is read (the converter is the one that source generation can use).
+    [JsonConverter(typeof(JsonStringEnumConverter<Classes>))]
     public enum Classes
     {
         All,
@@ -53,7 +55,6 @@ public class InstallableBook
         get => field ?? Language;
         set => field = value;
     }
-    [JsonIgnore]
     public string? Image { get; set; }
 
     string? languageCode = null;

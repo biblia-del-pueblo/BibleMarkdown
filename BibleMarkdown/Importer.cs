@@ -8,8 +8,8 @@ using System.Threading.Tasks;
 using System.Diagnostics.Contracts;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System.Security.Cryptography.X509Certificates;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.IO.Compression;
 using System.Reflection.Metadata.Ecma335;
 
@@ -88,10 +88,7 @@ public class Importer: WithTransform
         {
             var json = File.ReadAllText(file, Encoding.UTF8);
             // The class may be stored as its name ("Bible") or its number.
-            return JsonConvert.DeserializeObject<InstallableBook>(json, new JsonSerializerSettings
-            {
-                Converters = { new Newtonsoft.Json.Converters.StringEnumConverter() },
-            });
+            return JsonSerializer.Deserialize(json, JsonContext.Plain.InstallableBook);
         }
         catch (JsonException ex)
         {
@@ -1207,30 +1204,30 @@ public class Importer: WithTransform
         var json = System.IO.Directory.EnumerateFiles(SourcePath, "*.json")
             .Select(file => File.ReadAllText(file))
             .Where(src => src.Contains("\"version\":") && src.Contains("\"versionName\":") && src.Contains("\"books\":"))
-            .Select(src => JObject.Parse(src))
+            .Select(src => JsonNode.Parse(src))
             .FirstOrDefault();
         if (json == null) return this;
-        var books = json["books"] as JObject;
+        var books = json["books"] as JsonObject;
         int bookno = 1;
-        foreach (var book in books.Properties())
+        foreach (var book in books!)
         {
-            var name = book.Name;
+            var name = book.Key;
             var bookInfo = Books[Language]?.FirstOrDefault(b => b.Key == name).Value;
 
             var sb = new StringBuilder();
             var phrase = new StringBuilder();
             int chapterno = 1;
             int verseno;
-            foreach (var chapter in book.Value as JArray)
+            foreach (var chapter in book.Value!.AsArray())
             {
                 verseno = 1;
                 sb.AppendLine($"# {chapterno++}");
-                foreach (var versetoken in chapter as JArray)
+                foreach (var versetoken in chapter!.AsArray())
                 {
                     string verse;
-                    if (versetoken is JArray versearr)
+                    if (versetoken is JsonArray versearr)
                     {
-                        var words = versearr.Select(x => (string)(((JArray)x)[0]));
+                        var words = versearr.Select(x => (string)x!.AsArray()[0]!);
                         phrase.Clear();
                         foreach (var word in words)
                         {
@@ -1244,7 +1241,7 @@ public class Importer: WithTransform
                     }
                     else
                     {
-                        verse = (string)versetoken;
+                        verse = (string)versetoken!;
                     }
                     verse = Regex.Replace(verse, "<[0-9A-Z]+>", "");
                     if (EachVerseOnNewLine) sb.AppendLine($"@{verseno++} {verse}");

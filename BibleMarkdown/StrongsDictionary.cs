@@ -299,14 +299,6 @@ public static class StrongsMarkup
     }
 }
 
-/// <summary>An entry of the Strong's database: the Strong's number ("G26", "H7225") and its definition as markdown.</summary>
-public sealed class StrongsEntry
-{
-    /// <summary>The Strong's number: "G" (Greek) or "H" (Hebrew) and the number without leading zeros.</summary>
-    public string Id { get; set; } = "";
-    public string Markdown { get; set; } = "";
-}
-
 /// <summary>
 /// The Strong's dictionaries of a Bible, in a LiteDB database (one file, collection <c>strongs</c>, the Strong's number
 /// as the id of every entry). Greek and Hebrew entries are in the same database, so a number such as "G26" is looked up
@@ -318,7 +310,9 @@ public sealed class StrongsDatabase : IDisposable
     const string Collection = "strongs";
 
     readonly LiteDB.LiteDatabase database;
-    readonly LiteDB.ILiteCollection<StrongsEntry> entries;
+    // The entries are documents, not objects of a class: LiteDB would make the objects by reflection, which code compiled ahead of time (native AOT) cannot do.
+    // An entry has the Strong's number as its _id and the markdown as its Markdown.
+    readonly LiteDB.ILiteCollection<LiteDB.BsonDocument> entries;
 
     StrongsDatabase(string path, bool readOnly)
     {
@@ -328,7 +322,7 @@ public sealed class StrongsDatabase : IDisposable
             Connection = LiteDB.ConnectionType.Direct,
             ReadOnly = readOnly,
         });
-        entries = database.GetCollection<StrongsEntry>(Collection);
+        entries = database.GetCollection(Collection);
     }
 
     /// <summary>Opens the database to read from it (it must exist).</summary>
@@ -342,16 +336,16 @@ public sealed class StrongsDatabase : IDisposable
     public static void Write(string path, IEnumerable<(string Key, string Markdown)> entries)
     {
         using var database = new StrongsDatabase(path, readOnly: false);
-        database.entries.Upsert(entries.Select(e => new StrongsEntry { Id = e.Key, Markdown = e.Markdown }));
+        database.entries.Upsert(entries.Select(e => new LiteDB.BsonDocument { ["_id"] = e.Key, ["Markdown"] = e.Markdown }));
     }
 
     /// <summary>The number of entries.</summary>
     public int Count => entries.Count();
 
     /// <summary>The markdown of an entry ("G26"), or null if there is none.</summary>
-    public string? Get(string key) => entries.FindById(key)?.Markdown;
+    public string? Get(string key) => entries.FindById(key) is { } entry && entry.TryGetValue("Markdown", out var markdown) && markdown.IsString ? markdown.AsString : null;
 
-    public bool Contains(string key) => entries.Exists(e => e.Id == key);
+    public bool Contains(string key) => entries.FindById(key) != null;
 
     /// <summary>The key of a Strong's number: "G26" or "H7225"; the number may be padded with zeros ("00026" with prefix "G").</summary>
     public static string? NormalizeKey(string key, string? defaultPrefix)

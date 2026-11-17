@@ -54,7 +54,6 @@
     <ItemGroup>
         <PackageReference Include="CliWrap" />
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" />
-        <PackageReference Include="Newtonsoft.Json" />
         <PackageReference Include="LiteDB" />
         <PackageReference Include="EstrellasDeEsperanza.AsyncLock" />
     </ItemGroup>

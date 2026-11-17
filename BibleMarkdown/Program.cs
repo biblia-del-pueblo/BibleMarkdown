@@ -197,7 +197,7 @@ Options:
             return;
         }
 
-        if (InstallGlobal)
+        /*if (InstallGlobal)
         {
             // Install bibmark on Linux & macOS systems
             if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
@@ -246,7 +246,7 @@ Options:
                 }
                 catch { }
             }
-        }
+        }*/
 
         // Get the version of the current application.
         var aname = Assembly.GetExecutingAssembly().GetName();
