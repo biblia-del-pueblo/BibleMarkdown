@@ -67,15 +67,31 @@ public class InstallableBook
 
     public virtual string LanguageCode
     {
-        get => languageCode ??=
+        get => WithScript(languageCode ??=
             Regex.IsMatch(Language, @"^[a-z]{2,3}(?:-[A-Z]{2,3})?$") ? Language :
                 LanguageCodes.GetOrAdd((Language, LanguageEnglishName), key =>
                     Cultures
                         .FirstOrDefault(culture =>
                             culture.EnglishName.Contains(key.Item2) ||
                             culture.NativeName.Contains(key.Item1) ||
-                            culture.Name.Contains(key.Item1))?.Name)!;
+                            culture.Name.Contains(key.Item1))?.Name)!)!;
         set => languageCode = value;
+    }
+
+    /// <summary>
+    /// Serbian is written in two scripts, which a language code without a script ("sr", "sr-RS") does not tell: a Bible whose name or language is written
+    /// in Cyrillic letters (or whose English name says Cyrillic) is "sr-Cyrl", one whose English name says Latin "sr-Latn".
+    /// </summary>
+    string? WithScript(string? code)
+    {
+        if (code is null || !(code.Equals("sr", StringComparison.OrdinalIgnoreCase) || code.StartsWith("sr-", StringComparison.OrdinalIgnoreCase))) return code;
+        var parts = code.Split('-');
+        if (parts.Length > 1 && parts[1].Length == 4) return code; // it has a script already ("sr-Latn", "sr-Cyrl-RS")
+        bool Cyrillic(string? text) => text?.Any(c => c is >= 'Ѐ' and <= 'ӿ') == true;
+        // The Language is no evidence (eBible says "Српски/ Srpski" for both scripts): the name of the Bible is, and the English name where it says the script.
+        bool latin = EnglishName?.Contains("Latin", StringComparison.OrdinalIgnoreCase) == true;
+        bool cyrillic = !latin && (Cyrillic(Name) || EnglishName?.Contains("Cyrillic", StringComparison.OrdinalIgnoreCase) == true);
+        return cyrillic ? "sr-Cyrl" + (parts.Length > 1 ? "-" + parts[1] : "") : latin ? "sr-Latn" + (parts.Length > 1 ? "-" + parts[1] : "") : code;
     }
     public virtual InstallableBook Upgrade() => this;
     public InstallableBook() { }
