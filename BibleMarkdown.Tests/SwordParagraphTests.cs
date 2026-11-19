@@ -65,6 +65,33 @@ public class SwordParagraphTests
     }
 
     [Fact]
+    public void OsisXpDivMilestones_StartAndEnd_AsInTheModulesOfEBible()
+    {
+        // Genesis 1:3 of the World English Bible of ebible.org, a module made by osis2mod: the paragraph starts in this verse.
+        var start = Osis("<div type=\"x-milestone\" subType=\"x-preverse\" sID=\"pv1\"/><div sID=\"gen7\" type=\"x-p\"/> <div type=\"x-milestone\" subType=\"x-preverse\" eID=\"pv1\"/>God said, “Let there be light,” and there was light.");
+        Assert.True(start.Paragraph);
+        Assert.False(start.ParagraphAfter);
+        Assert.Equal("God said, “Let there be light,” and there was light.", start.Text);
+
+        // Matthew 5:2: the paragraph ends after the last text of the verse.
+        var end = Osis("He opened his mouth and taught them, saying,  <div eID=\"gen25582\" type=\"x-p\"/>");
+        Assert.False(end.Paragraph);
+        Assert.True(end.ParagraphAfter);
+    }
+
+    [Fact]
+    public void OsisXpDivs_GiveTheParagraphsOfAChapter()
+    {
+        var verses = SwordChapter.KeepVersesWithText(Chapter(Osis,
+            "<div sID=\"p1\" type=\"x-p\"/>One.",
+            "Two.<div eID=\"p1\" type=\"x-p\"/>",
+            "<div sID=\"p2\" type=\"x-p\"/>Three.",
+            "Four.<div eID=\"p2\" type=\"x-p\"/>"));
+
+        Assert.Equal([true, false, true, false], verses.Select(v => v.Verse.Paragraph));
+    }
+
+    [Fact]
     public void OsisPilcrowMilestone_StartsAParagraph()
     {
         var verse = Osis("<milestone type=\"x-p\" marker=\"&#182;\"/>And God said.");

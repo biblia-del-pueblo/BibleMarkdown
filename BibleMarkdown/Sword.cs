@@ -967,8 +967,8 @@ public static class SwordMarkup
 				case "p": // the end of a paragraph too: the next text, in this verse or the next one, starts another
 					Paragraph();
 					break;
-				case "div":
-					if (!close && attrs.GetValueOrDefault("type") == "paragraph") Paragraph();
+				case "div": // "x-p" is what osis2mod makes of a paragraph (<div sID="gen7" type="x-p"/> ... <div eID="gen7" type="x-p"/>, as in the modules of ebible.org)
+					if (!close && (attrs.GetValueOrDefault("type") is "paragraph" or "x-p")) Paragraph();
 					break;
 				case "milestone":
 					if (attrs.GetValueOrDefault("type") == "x-p" || attrs.GetValueOrDefault("marker", "").Contains('¶')) Paragraph();
