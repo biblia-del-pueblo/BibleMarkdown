@@ -35,6 +35,7 @@
         <!-- Do not set IncludeContentInPack to false: NuGet then skips collecting every item marked Pack="true",
              including the README.md below, and pack fails with NU5039 "The readme file does not exist in the package". -->
         <IncludeBuildOutput>true</IncludeBuildOutput>
+        <IsAotCompatible>true</IsAotCompatible>
     </PropertyGroup>
 
     <PropertyGroup Condition="$(PackAsTool) == 'true'">
@@ -75,7 +76,7 @@
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>
     </ItemGroup>
-    
+
     <!--<Target Name="IncludeReadmeInPackage" AfterTargets="Build">
         <Copy
           SourceFiles="..\README.md"
