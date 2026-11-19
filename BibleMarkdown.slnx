@@ -8,4 +8,5 @@
     <Build Solution="Release|*" />
   </Project>
   <Project Path="BibleMarkdown/BibleMarkdown.csproj" />
+  <Project Path="BibleMarkdown.Tests/BibleMarkdown.Tests.csproj" />
 </Solution>

@@ -762,47 +762,23 @@ public class Importer: WithTransform
                     int notes = 0; // the footnotes are lettered a, b, c... in every chapter
                     string NextLabel() => FootnoteLabel(notes++);
 
-                    var verses = new List<(int Number, SwordVerse Verse)>();
+                    var converted = new List<(int Number, SwordVerse Verse)>();
                     for (int number = 1; number <= book.Verses[chapter - 1]; number++)
                     {
                         var raw = module.Read(book.NewTestament, versification.Index(book, chapter, number));
                         if (raw.Length == 0) continue;
-                        var verse = SwordMarkup.Convert(raw, module.SourceType, NextLabel, ImportStrongs);
-                        if (verse.Text.Length > 0) verses.Add((number, verse)); // empty verses are removed, as the import of USFM does
+                        converted.Add((number, SwordMarkup.Convert(raw, module.SourceType, NextLabel, ImportStrongs)));
                     }
+                    // empty verses are removed, as the import of USFM does; a paragraph marker at the end of a verse starts a paragraph with the next one
+                    var verses = SwordChapter.KeepVersesWithText(converted);
                     if (verses.Count == 0) continue;
 
                     // The entry of verse 0 is the heading of the chapter: its titles and an introduction.
                     var heading = SwordMarkup.Convert(module.Read(book.NewTestament, versification.Index(book, chapter, 0)),
                         module.SourceType, NextLabel, ImportStrongs);
 
-                    if (text.Length > 0) text.Append(nl).Append(nl);
-                    text.Append($"# {chapter}{nl}");
-                    foreach (var title in heading.Titles) text.Append($"## {title}{nl}");
-                    if (heading.Text.Length > 0) text.Append($"*{heading.Text}* \\{nl}"); // like the verse 0 of the import of USFM
-
-                    bool first = true;
-                    foreach (var (number, verse) in verses)
-                    {
-                        if (verse.Titles.Count > 0)
-                        {
-                            if (!first) text.Append(nl).Append(nl);
-                            foreach (var title in verse.Titles) text.Append($"## {title}{nl}");
-                        }
-                        else if (!first)
-                        {
-                            // a new paragraph is an empty line
-                            if (verse.Paragraph) text.Append(nl).Append(nl);
-                            else if (EachVerseOnNewLine) text.Append(nl);
-                            else text.Append(' ');
-                        }
-                        if (verse.Psalm != null) text.Append($"*{verse.Psalm}* \\{nl}"); // the title of a psalm is verse 0
-
-                        text.Append($"@{number} "); // the verse style of Bible Markdown (^1^ is legacy)
-                        text.Append(verse.Text);
-                        foreach (var (label, note) in verse.Notes) text.Append($" ^{label}^[{note}]"); // the footnotes follow their verse
-                        first = false;
-                    }
+                    // the footnotes follow the paragraph, as in the import of USFM
+                    SwordChapter.Append(text, nl, chapter, heading, verses, EachVerseOnNewLine);
                 }
                 if (text.Length == 0) continue;
 
@@ -911,26 +887,8 @@ public class Importer: WithTransform
                     }
                     if (verses.Count == 0) continue;
 
-                    if (text.Length > 0) text.Append(nl).Append(nl);
-                    text.Append($"# {chapter}{nl}");
-                    bool first = true;
-                    foreach (var (verseNumber, verse) in verses)
-                    {
-                        if (verse.Titles.Count > 0)
-                        {
-                            if (!first) text.Append(nl).Append(nl);
-                            foreach (var title in verse.Titles) text.Append($"## {title}{nl}");
-                        }
-                        else if (!first)
-                        {
-                            if (verse.Paragraph) text.Append(nl).Append(nl); // a new paragraph is an empty line
-                            else if (EachVerseOnNewLine) text.Append(nl);
-                            else text.Append(' ');
-                        }
-                        text.Append($"@{verseNumber} ").Append(verse.Text);
-                        foreach (var (label, note) in verse.Notes) text.Append($" ^{label}^[{note}]"); // the footnotes follow their verse
-                        first = false;
-                    }
+                    // the footnotes follow the paragraph, as in the import of USFM
+                    SwordChapter.Append(text, nl, chapter, null, verses, EachVerseOnNewLine);
                 }
                 if (text.Length == 0) continue;
 

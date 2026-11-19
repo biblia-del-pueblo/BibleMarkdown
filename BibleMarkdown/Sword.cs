@@ -622,10 +622,114 @@ public sealed class SwordVerse
 	public string? Psalm { get; set; }
 	/// <summary>A paragraph starts with this verse.</summary>
 	public bool Paragraph { get; set; }
+	/// <summary>
+	/// A paragraph marker came after the last text of this verse (GBF has its &lt;CM&gt; there, OSIS a closing &lt;/p&gt; or the end milestone of a paragraph): the next verse starts a
+	/// paragraph. A marker in the middle of the verse is a blank line in its text, and a marker before its text sets <see cref="Paragraph"/>.
+	/// </summary>
+	public bool ParagraphAfter { get; set; }
 	/// <summary>The words of the verse; the footnotes are only a marker ^label^ in it.</summary>
 	public string Text { get; set; } = "";
 	/// <summary>The footnotes of the verse, to be written as ^label^[text].</summary>
 	public List<(string Label, string Text)> Notes { get; } = new();
+}
+
+/// <summary>The verses of a chapter of a SWORD module, after they are converted.</summary>
+public static class SwordChapter
+{
+    /// <summary>
+    /// Removes the verses without text (as the import of USFM does) and hands the paragraph markers on: a marker that came after the last text of a verse
+    /// (<see cref="SwordVerse.ParagraphAfter"/>) starts a paragraph with the next verse, also when the verses between have no text (their markers stay).
+    /// </summary>
+    /// <param name="converted">The verses of the chapter in order, with their numbers; the ones that have no text too.</param>
+    public static List<(int Number, SwordVerse Verse)> KeepVersesWithText(IEnumerable<(int Number, SwordVerse Verse)> converted)
+    {
+        var verses = new List<(int Number, SwordVerse Verse)>();
+        bool paragraphBefore = false; // a paragraph marker at the end of the verse before: this verse starts a paragraph
+        foreach (var (number, verse) in converted)
+        {
+            if (verse.Text.Length == 0) { paragraphBefore |= verse.Paragraph || verse.ParagraphAfter; continue; }
+            verse.Paragraph |= paragraphBefore;
+            paragraphBefore = verse.ParagraphAfter;
+            verses.Add((number, verse));
+        }
+        return verses;
+    }
+
+    /// <summary>
+    /// Writes a chapter as Bible Markdown, to <paramref name="text"/>: its heading, the titles, the verses as @n, and the paragraphs as empty lines. The footnotes are only a
+    /// marker ^a^ in the text of the verses, as the import of USFM has them: the bodies ^a^[Footnote] follow the paragraph (the first on a new line, the others after it,
+    /// separated by a space), when it ends with the next paragraph or title, or with the chapter.
+    /// </summary>
+    /// <param name="text">What is written to: the book, with the chapters before this one.</param>
+    /// <param name="nl">The line break.</param>
+    /// <param name="chapter">The number of the chapter.</param>
+    /// <param name="heading">The entry of verse 0 of the chapter: its titles and an introduction (null when there is none).</param>
+    /// <param name="verses">The verses with text, see <see cref="KeepVersesWithText"/>.</param>
+    /// <param name="eachVerseOnNewLine">Whether a verse that does not start a paragraph starts a new line.</param>
+    public static void Append(StringBuilder text, string nl, int chapter, SwordVerse? heading, IReadOnlyList<(int Number, SwordVerse Verse)> verses, bool eachVerseOnNewLine)
+    {
+        if (text.Length > 0) text.Append(nl).Append(nl);
+        text.Append($"# {chapter}{nl}");
+
+        var pending = new List<(string Label, string Text)>(); // the footnotes of the paragraph, whose markers are written
+        void WriteBodies(List<(string Label, string Text)> bodies)
+        {
+            if (bodies.Count == 0) return;
+            text.Append(nl).Append(string.Join(" ", bodies.Select(note => $"^{note.Label}^[{note.Text}]")));
+        }
+        void EndParagraph()
+        {
+            WriteBodies(pending);
+            pending.Clear();
+        }
+
+        if (heading != null)
+        {
+            foreach (var title in heading.Titles) text.Append($"## {title}{nl}");
+            if (heading.Text.Length > 0) text.Append($"*{heading.Text}* \\{nl}"); // like the verse 0 of the import of USFM
+            pending.AddRange(heading.Notes);
+        }
+
+        bool first = true;
+        foreach (var (number, verse) in verses)
+        {
+            if (verse.Titles.Count > 0)
+            {
+                if (!first) { EndParagraph(); text.Append(nl).Append(nl); }
+                foreach (var title in verse.Titles) text.Append($"## {title}{nl}");
+            }
+            else if (!first)
+            {
+                if (verse.Paragraph) { EndParagraph(); text.Append(nl).Append(nl); } // a new paragraph is an empty line
+                else if (eachVerseOnNewLine) text.Append(nl);
+                else text.Append(' ');
+            }
+            if (verse.Psalm != null) text.Append($"*{verse.Psalm}* \\{nl}"); // the title of a psalm is verse 0
+
+            text.Append($"@{number} "); // the verse style of Bible Markdown (^1^ is legacy)
+
+            // A paragraph can end inside a verse (an empty line in its text): the footnotes of the verses until there, and the ones whose marker is in the text until there,
+            // follow it. The other footnotes of the verse follow the paragraph that has their marker.
+            var notes = verse.Notes.ToList();
+            var parts = verse.Text.Split("\n\n");
+            var written = new StringBuilder();
+            for (int i = 0; i < parts.Length; i++)
+            {
+                text.Append(parts[i]);
+                written.Append(parts[i]);
+                if (i == parts.Length - 1) break;
+
+                var marked = notes.Where(note => written.ToString().Contains($"^{note.Label}^")).ToList();
+                notes.RemoveAll(marked.Contains);
+                pending.AddRange(marked);
+                EndParagraph();
+                text.Append(nl).Append(nl);
+            }
+            pending.AddRange(notes);
+            first = false;
+        }
+        EndParagraph(); // the chapter ends the paragraph
+    }
 }
 
 /// <summary>Converts the text of a verse in the markup of a SWORD module (OSIS, GBF, ThML) to Bible Markdown.</summary>
@@ -860,8 +964,8 @@ public static class SwordMarkup
 				case "lb":
 					lineBreak = true;
 					break;
-				case "p":
-					if (!close) Paragraph();
+				case "p": // the end of a paragraph too: the next text, in this verse or the next one, starts another
+					Paragraph();
 					break;
 				case "div":
 					if (!close && attrs.GetValueOrDefault("type") == "paragraph") Paragraph();
@@ -884,6 +988,7 @@ public static class SwordMarkup
 		}
 
 		verse.Text = Clean(sb.ToString());
+		verse.ParagraphAfter = paragraph; // a marker after the last text was not written: the next verse starts a paragraph
 		return verse;
 	}
 
